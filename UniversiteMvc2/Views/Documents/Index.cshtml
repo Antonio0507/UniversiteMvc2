@@ -1,0 +1,87 @@
+@model DemandeDocument
+@using System.ComponentModel.DataAnnotations
+@using System.Reflection
+@{
+    ViewData["Title"] = "Documents PDF";
+    IEnumerable<SelectListItem> Liste(string nom) => (IEnumerable<SelectListItem>)ViewData[nom]!;
+}
+
+<header class="entete">
+    <div>
+        <h1>Documents PDF</h1>
+        <p class="entete__resume">Choisissez un document et renseignez-le : le PDF s'ouvre dans le navigateur, prêt à imprimer ou à enregistrer.</p>
+    </div>
+</header>
+
+<form asp-action="Index" method="post" class="formulaire" data-documents>
+    <div asp-validation-summary="ModelOnly" class="resume-erreurs"></div>
+
+    <section class="groupe">
+        <div>
+            <h2 class="groupe__titre">Document</h2>
+        </div>
+        <div class="choix" role="radiogroup" aria-label="Type de document">
+            @foreach (var type in Enum.GetValues<TypeDocument>())
+            {
+                var affichage = typeof(TypeDocument).GetField(type.ToString())!.GetCustomAttribute<DisplayAttribute>()!;
+                <label class="choix__option">
+                    <input type="radio" name="@nameof(Model.Type)" value="@type" checked="@(Model.Type == type)" />
+                    <span class="choix__titre">@affichage.Name</span>
+                    <span class="choix__aide">@affichage.Description</span>
+                </label>
+            }
+        </div>
+    </section>
+
+    <section class="groupe" data-pour="AttestationInscription RelevePaiements ReleveNotes">
+        <div>
+            <h2 class="groupe__titre">Inscription</h2>
+            <p class="groupe__note">L'attestation et le relevé de notes ne sont délivrés que pour une inscription validée.</p>
+        </div>
+        <div class="grille-champs">
+            <champ asp-for="InscriptionId" asp-items="Liste(nameof(Model.InscriptionId))" vide="— Choisir une inscription —" obligatoire="true" class="champ--large" />
+        </div>
+    </section>
+
+    <section class="groupe" data-pour="RecuPaiement">
+        <div>
+            <h2 class="groupe__titre">Paiement</h2>
+        </div>
+        <div class="grille-champs">
+            <champ asp-for="PaiementId" asp-items="Liste(nameof(Model.PaiementId))" vide="— Choisir un paiement —" obligatoire="true" class="champ--large" />
+        </div>
+    </section>
+
+    <section class="groupe" data-pour="ListeInscrits">
+        <div>
+            <h2 class="groupe__titre">Critères</h2>
+            <p class="groupe__note">Seule l'année est obligatoire ; les autres critères affinent la liste.</p>
+        </div>
+        <div class="grille-champs">
+            <champ asp-for="AnneeAcadId" asp-items="Liste(nameof(Model.AnneeAcadId))" vide="— Choisir —" obligatoire="true" class="champ--large" />
+            <champ asp-for="FiliereId" asp-items="Liste(nameof(Model.FiliereId))" vide="Toutes les filières" />
+            <champ asp-for="NiveauId" asp-items="Liste(nameof(Model.NiveauId))" vide="Tous les niveaux" />
+            <champ asp-for="Statut" asp-items="Liste(nameof(Model.Statut))" vide="Tous les statuts" />
+        </div>
+    </section>
+
+    <section class="groupe">
+        <div>
+            <h2 class="groupe__titre">Signature</h2>
+            <p class="groupe__note">Imprimée en bas du document, au-dessus de l'espace réservé au cachet.</p>
+        </div>
+        <div class="grille-champs">
+            <champ asp-for="Signataire" class="champ--large" />
+            <champ asp-for="Lieu" placeholder="Lomé" />
+            <champ asp-for="DateDocument" />
+        </div>
+    </section>
+
+    <div class="formulaire__actions">
+        <button type="submit" class="btn btn--plein">Générer le PDF</button>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

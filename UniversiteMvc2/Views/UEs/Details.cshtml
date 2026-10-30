@@ -1,0 +1,66 @@
+@model UE
+@{
+    ViewData["Title"] = $"{Model.Code} — {Model.Intitule}";
+    var cours = Model.Cours.OrderBy(c => c.Intitule).ToList();
+}
+
+<header class="entete">
+    <div>
+        <p class="entete__sur mono">@Model.Code</p>
+        <h1>@Model.Intitule</h1>
+    </div>
+    <div class="entete__actions">
+        <a asp-controller="Cours" asp-action="Create" asp-route-ueId="@Model.Id" class="btn btn--plein">Ajouter un cours</a>
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn">Modifier</a>
+        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn--danger">Supprimer</a>
+    </div>
+</header>
+
+<dl class="fiche">
+    <div><dt>Filière</dt><dd><a asp-controller="Filieres" asp-action="Details" asp-route-id="@Model.FiliereId">@Model.Filiere?.Nom</a></dd></div>
+    <div><dt>Niveau</dt><dd><a asp-controller="Niveaux" asp-action="Details" asp-route-id="@Model.NiveauId">@Model.Niveau?.Libelle</a></dd></div>
+    <div><dt>Crédits</dt><dd class="grand">@Model.Credits</dd></div>
+    <div><dt>Volume horaire</dt><dd class="grand">@cours.Sum(c => c.VolumeHoraire) h</dd></div>
+</dl>
+
+<section class="bloc">
+    <div class="bloc__tete">
+        <h2 class="bloc__titre">Cours <span class="bloc__compte">@cours.Count</span></h2>
+    </div>
+    @if (cours.Count == 0)
+    {
+        <p class="vide">Aucun cours dans cette UE. <a asp-controller="Cours" asp-action="Create" asp-route-ueId="@Model.Id">Ajouter un cours</a></p>
+    }
+    else
+    {
+        <div class="defilement">
+            <table class="registre">
+                <thead>
+                    <tr><th>Cours</th><th>Enseignant</th><th class="num">Volume</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in cours)
+                    {
+                        <tr>
+                            <td><a class="lien-fort" asp-controller="Cours" asp-action="Details" asp-route-id="@c.Id">@c.Intitule</a></td>
+                            <td>
+                                @if (c.Enseignant == null)
+                                {
+                                    <span class="discret">Non attribué</span>
+                                }
+                                else
+                                {
+                                    <a asp-controller="Enseignants" asp-action="Details" asp-route-id="@c.EnseignantId">@c.Enseignant.NomComplet</a>
+                                }
+                            </td>
+                            <td class="num">@c.VolumeHoraire h</td>
+                            <td class="actions"><a asp-controller="Cours" asp-action="Edit" asp-route-id="@c.Id">Modifier</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+<a class="retour" asp-action="Index">← Toutes les UE</a>

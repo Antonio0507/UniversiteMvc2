@@ -1,0 +1,76 @@
+@model ListePaginee<Paiement>
+@{
+    ViewData["Title"] = "Paiements";
+    var q = ViewData["q"] as string;
+    var modes = (SelectList)ViewData["Mode"]!;
+    var annees = (SelectList)ViewData["AnneeId"]!;
+    var total = (decimal)ViewData["Total"]!;
+    var filtre = Context.Request.Query.Keys.Any(k => k != "page" && !string.IsNullOrEmpty(Context.Request.Query[k]));
+}
+
+<header class="entete">
+    <div>
+        <h1>Paiements</h1>
+        <p class="entete__resume">@Formats.Pluriel(Model.Total, "versement") · <strong>@Formats.Montant(total)</strong> @(filtre ? "sur la sélection" : "encaissés au total")</p>
+    </div>
+    <div class="entete__actions">
+        <a asp-action="Impayes" class="btn">Impayés</a>
+        <a asp-action="Exporter" asp-all-route-data="@Context.Request.Query.Where(k => k.Key != "page").ToDictionary(k => k.Key, k => k.Value.ToString())" class="btn">Exporter (CSV)</a>
+        <a asp-action="Create" class="btn btn--plein">Enregistrer un paiement</a>
+    </div>
+</header>
+
+<form method="get" class="filtres" role="search">
+    <label class="filtres__recherche">
+        <span class="sr">Rechercher un étudiant</span>
+        <input type="search" name="q" value="@q" placeholder="Étudiant ou matricule" data-recherche />
+        <kbd>/</kbd>
+    </label>
+    <label class="sr" for="anneeId">Année</label>
+    <select id="anneeId" name="anneeId" asp-items="annees"><option value="">Toutes les années</option></select>
+    <label class="sr" for="mode">Mode</label>
+    <select id="mode" name="mode" asp-items="modes"><option value="">Tous les modes</option></select>
+    <button class="btn" type="submit">Filtrer</button>
+    @if (filtre)
+    {
+        <a asp-action="Index" class="btn btn--lien">Effacer</a>
+    }
+</form>
+
+@if (Model.Total == 0)
+{
+    <p class="vide">Aucun paiement ne correspond. <a asp-action="Create">Enregistrer un paiement</a></p>
+}
+else
+{
+    <div class="defilement">
+        <table class="registre">
+            <thead>
+                <tr>
+                    <th>Reçu</th>
+                    <th>Date</th>
+                    <th>Étudiant</th>
+                    <th class="masquer-etroit">Inscription</th>
+                    <th>Mode</th>
+                    <th class="num">Montant</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model.Elements)
+                {
+                    <tr>
+                        <td class="mono"><a asp-action="Details" asp-route-id="@p.Id" class="lien-fort">@Formats.NumeroRecu(p.Id)</a></td>
+                        <td>@Formats.Date(p.DatePaiement)</td>
+                        <td>@p.Inscription?.Etudiant?.NomComplet</td>
+                        <td class="mono masquer-etroit"><a asp-controller="Inscriptions" asp-action="Details" asp-route-id="@p.InscriptionId">@p.Inscription?.Filiere?.Code · @p.Inscription?.AnneeAcad?.Libelle</a></td>
+                        <td class="discret">@p.Mode</td>
+                        <td class="num">@Formats.Montant(p.Montant)</td>
+                        <td class="actions"><a asp-action="Edit" asp-route-id="@p.Id">Modifier</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pagination" model="Model" />
+}

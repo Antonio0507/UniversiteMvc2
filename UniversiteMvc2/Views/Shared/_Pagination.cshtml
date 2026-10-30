@@ -1,0 +1,43 @@
+@model IPagination
+@using Microsoft.AspNetCore.WebUtilities
+@{
+    // Conserve les filtres en cours dans les liens de page
+    string Lien(int page)
+    {
+        var parametres = Context.Request.Query
+            .Where(p => p.Key != "page")
+            .ToDictionary(p => p.Key, p => (string?)p.Value.ToString());
+        parametres["page"] = page.ToString();
+        return QueryHelpers.AddQueryString(Context.Request.Path, parametres);
+    }
+
+    var debut = Math.Max(1, Model.Page - 2);
+    var fin = Math.Min(Model.NombrePages, Model.Page + 2);
+}
+@if (Model.NombrePages > 1)
+{
+    <nav class="pagination" aria-label="Pages">
+        <span>Page @Model.Page sur @Model.NombrePages</span>
+        <div class="pagination__liens">
+            @if (Model.Page > 1)
+            {
+                <a href="@Lien(Model.Page - 1)" aria-label="Page précédente">←</a>
+            }
+            @for (var p = debut; p <= fin; p++)
+            {
+                if (p == Model.Page)
+                {
+                    <span aria-current="page">@p</span>
+                }
+                else
+                {
+                    <a href="@Lien(p)">@p</a>
+                }
+            }
+            @if (Model.Page < Model.NombrePages)
+            {
+                <a href="@Lien(Model.Page + 1)" aria-label="Page suivante">→</a>
+            }
+        </div>
+    </nav>
+}

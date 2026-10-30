@@ -1,0 +1,76 @@
+@model ListePaginee<Etudiant>
+@{
+    ViewData["Title"] = "Étudiants";
+    var q = ViewData["q"] as string;
+}
+
+<header class="entete">
+    <div>
+        <h1>Étudiants</h1>
+        <p class="entete__resume">@Formats.Pluriel(Model.Total, "dossier") @(string.IsNullOrEmpty(q) ? "au registre" : $"pour « {q} »")</p>
+    </div>
+    <div class="entete__actions">
+        <a asp-action="Exporter" asp-route-q="@q" class="btn">Exporter (CSV)</a>
+        <a asp-action="Create" class="btn btn--plein">Nouvel étudiant</a>
+    </div>
+</header>
+
+<form method="get" class="filtres" role="search">
+    <label class="filtres__recherche">
+        <span class="sr">Rechercher un étudiant</span>
+        <input type="search" name="q" value="@q" placeholder="Nom, prénom, matricule ou e-mail" data-recherche />
+        <kbd>/</kbd>
+    </label>
+    <button class="btn" type="submit">Rechercher</button>
+    @if (!string.IsNullOrEmpty(q))
+    {
+        <a asp-action="Index" class="btn btn--lien">Effacer</a>
+    }
+</form>
+
+@if (Model.Total == 0)
+{
+    <p class="vide">Aucun étudiant ne correspond. <a asp-action="Create">Créer un dossier</a></p>
+}
+else
+{
+    <div class="defilement">
+        <table class="registre">
+            <thead>
+                <tr>
+                    <th>Matricule</th>
+                    <th>Nom et prénom</th>
+                    <th>Inscription la plus récente</th>
+                    <th class="masquer-etroit">E-mail</th>
+                    <th class="num">Naissance</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var e in Model.Elements)
+                {
+                    var derniere = e.Inscriptions.OrderByDescending(i => i.AnneeAcad?.DateDebut).FirstOrDefault();
+                    <tr>
+                        <td class="mono">@e.Matricule</td>
+                        <td><a asp-action="Details" asp-route-id="@e.Id" class="lien-fort">@e.Nom</a> @e.Prenom</td>
+                        <td>
+                            @if (derniere == null)
+                            {
+                                <span class="discret">—</span>
+                            }
+                            else
+                            {
+                                <span class="mono">@derniere.Filiere?.Code · @derniere.Niveau?.Code</span>
+                                <span class="discret">@derniere.AnneeAcad?.Libelle</span>
+                            }
+                        </td>
+                        <td class="masquer-etroit discret">@e.Email</td>
+                        <td class="num">@Formats.Date(e.DateNaissance)</td>
+                        <td class="actions"><a asp-action="Edit" asp-route-id="@e.Id">Modifier</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pagination" model="Model" />
+}

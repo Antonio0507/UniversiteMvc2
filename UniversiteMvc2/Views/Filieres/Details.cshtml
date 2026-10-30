@@ -1,0 +1,91 @@
+@model Filiere
+@{
+    ViewData["Title"] = Model.Nom;
+    var parNiveau = Model.UEs.OrderBy(u => u.NiveauId).ThenBy(u => u.Code).GroupBy(u => u.Niveau).ToList();
+    var parAnnee = Model.Inscriptions.GroupBy(i => i.AnneeAcad).OrderByDescending(g => g.Key?.DateDebut).ToList();
+}
+
+<header class="entete">
+    <div>
+        <p class="entete__sur mono">@Model.Code</p>
+        <h1>@Model.Nom</h1>
+    </div>
+    <div class="entete__actions">
+        <a asp-controller="UEs" asp-action="Create" asp-route-filiereId="@Model.Id" class="btn btn--plein">Ajouter une UE</a>
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn">Modifier</a>
+        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn--danger">Supprimer</a>
+    </div>
+</header>
+
+<dl class="fiche">
+    <div><dt>Unités d'enseignement</dt><dd class="grand">@Model.UEs.Count</dd></div>
+    <div><dt>Crédits</dt><dd class="grand">@Model.UEs.Sum(u => u.Credits)</dd></div>
+    <div><dt>Cours</dt><dd class="grand">@Model.UEs.Sum(u => u.Cours.Count)</dd></div>
+    <div><dt>Inscriptions</dt><dd class="grand">@Model.Inscriptions.Count</dd></div>
+</dl>
+
+<section class="bloc">
+    <div class="bloc__tete">
+        <h2 class="bloc__titre">Maquette pédagogique</h2>
+    </div>
+    @if (parNiveau.Count == 0)
+    {
+        <p class="vide">Aucune unité d'enseignement. <a asp-controller="UEs" asp-action="Create" asp-route-filiereId="@Model.Id">Ajouter une UE</a></p>
+    }
+    else
+    {
+        <div class="defilement">
+            <table class="registre">
+                <thead>
+                    <tr><th>Niveau</th><th>Code</th><th>Intitulé</th><th class="num">Crédits</th><th class="num">Cours</th></tr>
+                </thead>
+                @foreach (var groupe in parNiveau)
+                {
+                    <tbody>
+                        @foreach (var u in groupe)
+                        {
+                            <tr>
+                                <td class="mono">@(u == groupe.First() ? groupe.Key?.Code : "")</td>
+                                <td class="mono">@u.Code</td>
+                                <td><a class="lien-fort" asp-controller="UEs" asp-action="Details" asp-route-id="@u.Id">@u.Intitule</a></td>
+                                <td class="num">@u.Credits</td>
+                                <td class="num">@u.Cours.Count</td>
+                            </tr>
+                        }
+                    </tbody>
+                }
+            </table>
+        </div>
+    }
+</section>
+
+<section class="bloc">
+    <div class="bloc__tete">
+        <h2 class="bloc__titre">Effectifs par année</h2>
+    </div>
+    @if (parAnnee.Count == 0)
+    {
+        <p class="vide">Aucune inscription dans cette filière.</p>
+    }
+    else
+    {
+        <table class="registre">
+            <thead>
+                <tr><th>Année</th><th class="num">Inscrits</th><th class="num">Validés</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var g in parAnnee)
+                {
+                    <tr>
+                        <td class="mono">@g.Key?.Libelle</td>
+                        <td class="num">@g.Count()</td>
+                        <td class="num">@g.Count(i => i.Statut == Inscription.Validee)</td>
+                        <td class="actions"><a asp-controller="Inscriptions" asp-action="Index" asp-route-filiereId="@Model.Id" asp-route-anneeId="@g.Key?.Id">Liste</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+<a class="retour" asp-action="Index">← Toutes les filières</a>

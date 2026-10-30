@@ -1,0 +1,70 @@
+@model List<Cours>
+@{
+    ViewData["Title"] = "Cours";
+    var q = ViewData["q"] as string;
+    var enseignants = (List<SelectListItem>)ViewData["EnseignantId"]!;
+    var ues = (List<SelectListItem>)ViewData["UEId"]!;
+    var filtre = !string.IsNullOrEmpty(q) || Context.Request.Query.ContainsKey("enseignantId") || Context.Request.Query.ContainsKey("ueId");
+}
+
+<header class="entete">
+    <div>
+        <h1>Cours</h1>
+        <p class="entete__resume">@Formats.Pluriel(Model.Count, "cours") · @Model.Sum(c => c.VolumeHoraire) h · @Model.Count(c => c.EnseignantId == null) sans enseignant</p>
+    </div>
+    <div class="entete__actions">
+        <a asp-action="Create" class="btn btn--plein">Nouveau cours</a>
+    </div>
+</header>
+
+<form method="get" class="filtres" role="search">
+    <label class="filtres__recherche">
+        <span class="sr">Rechercher un cours</span>
+        <input type="search" name="q" value="@q" placeholder="Intitulé ou code d'UE" data-recherche />
+        <kbd>/</kbd>
+    </label>
+    <label class="sr" for="enseignantId">Enseignant</label>
+    <select id="enseignantId" name="enseignantId" asp-items="enseignants"><option value="">Tous les enseignants</option></select>
+    <label class="sr" for="ueId">UE</label>
+    <select id="ueId" name="ueId" asp-items="ues"><option value="">Toutes les UE</option></select>
+    <button class="btn" type="submit">Filtrer</button>
+    @if (filtre)
+    {
+        <a asp-action="Index" class="btn btn--lien">Effacer</a>
+    }
+</form>
+
+@if (Model.Count == 0)
+{
+    <p class="vide">Aucun cours ne correspond. <a asp-action="Create">Créer un cours</a></p>
+}
+else
+{
+    <div class="defilement">
+        <table class="registre">
+            <thead>
+                <tr>
+                    <th>UE</th>
+                    <th>Cours</th>
+                    <th class="masquer-etroit">Filière · niveau</th>
+                    <th>Enseignant</th>
+                    <th class="num">Volume</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in Model)
+                {
+                    <tr>
+                        <td class="mono"><a asp-controller="UEs" asp-action="Details" asp-route-id="@c.UEId">@c.UE?.Code</a></td>
+                        <td><a asp-action="Details" asp-route-id="@c.Id" class="lien-fort">@c.Intitule</a></td>
+                        <td class="mono masquer-etroit">@c.UE?.Filiere?.Code · @c.UE?.Niveau?.Code</td>
+                        <td>@(c.Enseignant?.NomComplet ?? "—")</td>
+                        <td class="num">@c.VolumeHoraire h</td>
+                        <td class="actions"><a asp-action="Edit" asp-route-id="@c.Id">Modifier</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

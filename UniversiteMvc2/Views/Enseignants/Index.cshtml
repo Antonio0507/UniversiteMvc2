@@ -1,0 +1,64 @@
+@model ListePaginee<Enseignant>
+@{
+    ViewData["Title"] = "Enseignants";
+    var q = ViewData["q"] as string;
+}
+
+<header class="entete">
+    <div>
+        <h1>Enseignants</h1>
+        <p class="entete__resume">@Formats.Pluriel(Model.Total, "enseignant") @(string.IsNullOrEmpty(q) ? "" : $"pour « {q} »")</p>
+    </div>
+    <div class="entete__actions">
+        <a asp-action="Create" class="btn btn--plein">Nouvel enseignant</a>
+    </div>
+</header>
+
+<form method="get" class="filtres" role="search">
+    <label class="filtres__recherche">
+        <span class="sr">Rechercher un enseignant</span>
+        <input type="search" name="q" value="@q" placeholder="Nom, prénom, e-mail ou spécialité" data-recherche />
+        <kbd>/</kbd>
+    </label>
+    <button class="btn" type="submit">Rechercher</button>
+    @if (!string.IsNullOrEmpty(q))
+    {
+        <a asp-action="Index" class="btn btn--lien">Effacer</a>
+    }
+</form>
+
+@if (Model.Total == 0)
+{
+    <p class="vide">Aucun enseignant ne correspond. <a asp-action="Create">Ajouter un enseignant</a></p>
+}
+else
+{
+    <div class="defilement">
+        <table class="registre">
+            <thead>
+                <tr>
+                    <th>Nom et prénom</th>
+                    <th>Grade</th>
+                    <th>Spécialité</th>
+                    <th class="num">Cours</th>
+                    <th class="num">Heures</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var e in Model.Elements)
+                {
+                    <tr>
+                        <td><a asp-action="Details" asp-route-id="@e.Id" class="lien-fort">@e.Nom</a> @e.Prenom</td>
+                        <td>@(e.Grade ?? "—")</td>
+                        <td class="discret">@(e.Specialite ?? "—")</td>
+                        <td class="num">@e.Cours.Count</td>
+                        <td class="num">@e.Cours.Sum(c => c.VolumeHoraire) h</td>
+                        <td class="actions"><a asp-action="Edit" asp-route-id="@e.Id">Modifier</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pagination" model="Model" />
+}

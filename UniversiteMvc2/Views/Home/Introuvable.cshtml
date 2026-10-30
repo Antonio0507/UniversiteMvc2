@@ -1,0 +1,18 @@
+@model int
+@{
+    var (titre, texte) = Model switch
+    {
+        403 => ("Accès non autorisé", "Votre profil ne permet pas cette action. Adressez-vous à un administrateur si vous en avez besoin."),
+        429 => ("Trop de tentatives", "Patientez une minute avant de réessayer."),
+        400 => ("Demande invalide", "Le formulaire a expiré ou n'est plus valide. Rechargez la page, puis réessayez."),
+        _ => ("Cette page n'existe pas", "L'adresse est peut-être incorrecte, ou l'élément demandé a été supprimé du registre.")
+    };
+    ViewData["Title"] = titre;
+}
+
+<div class="erreur-page">
+    <p class="erreur-page__code">@Model</p>
+    <h1>@titre</h1>
+    <p>@texte</p>
+    <a asp-controller="Home" asp-action="Index" class="btn">Retour au tableau de bord</a>
+</div>

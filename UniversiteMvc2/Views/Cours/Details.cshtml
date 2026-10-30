@@ -1,0 +1,36 @@
+@model Cours
+@{
+    ViewData["Title"] = Model.Intitule;
+}
+
+<header class="entete">
+    <div>
+        <p class="entete__sur mono">@Model.UE?.Code</p>
+        <h1>@Model.Intitule</h1>
+    </div>
+    <div class="entete__actions">
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn">Modifier</a>
+        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn--danger">Supprimer</a>
+    </div>
+</header>
+
+<dl class="fiche">
+    <div><dt>Unité d'enseignement</dt><dd><a asp-controller="UEs" asp-action="Details" asp-route-id="@Model.UEId">@Model.UE?.Intitule</a></dd></div>
+    <div><dt>Filière · niveau</dt><dd>@Model.UE?.Filiere?.Nom · @Model.UE?.Niveau?.Libelle</dd></div>
+    <div>
+        <dt>Enseignant</dt>
+        <dd>
+            @if (Model.Enseignant == null)
+            {
+                <text><span class="discret">Non attribué</span> · <a asp-action="Edit" asp-route-id="@Model.Id">attribuer</a></text>
+            }
+            else
+            {
+                <a asp-controller="Enseignants" asp-action="Details" asp-route-id="@Model.EnseignantId">@Model.Enseignant.NomComplet</a>
+            }
+        </dd>
+    </div>
+    <div><dt>Volume horaire</dt><dd class="grand">@Model.VolumeHoraire h</dd></div>
+</dl>
+
+<a class="retour" asp-action="Index">← Tous les cours</a>

@@ -1,0 +1,52 @@
+@model Compte
+@{
+    var creation = Model.Id == 0;
+    var titre = creation ? "Nouveau compte" : $"Modifier {Model.Nom}";
+    ViewData["Title"] = titre;
+}
+
+<header class="entete">
+    <div>
+        <h1>@titre</h1>
+        @if (!creation)
+        {
+            <p class="entete__resume">@Model.Email</p>
+        }
+    </div>
+</header>
+
+<form asp-action="@(creation ? "Create" : "Edit")" asp-route-id="@(creation ? null : (int?)Model.Id)" class="formulaire">
+    <div asp-validation-summary="ModelOnly" class="resume-erreurs"></div>
+
+    <section class="groupe">
+        <div>
+            <h2 class="groupe__titre">Compte</h2>
+            @if (creation)
+            {
+                <p class="groupe__note">Un mot de passe provisoire sera généré et affiché une seule fois ; il devra être changé à la première connexion.</p>
+            }
+        </div>
+        <div class="grille-champs">
+            @if (creation)
+            {
+                <champ asp-for="Email" class="champ--large" />
+            }
+            <champ asp-for="Nom" class="champ--large" />
+            <champ asp-for="Role" asp-items="(IEnumerable<SelectListItem>)ViewData[nameof(Model.Role)]!" />
+            @if (!creation)
+            {
+                <div class="champ">
+                    <label class="champ__libelle" for="Actif">Compte actif</label>
+                    <input type="hidden" name="Actif" value="false" />
+                    <input id="Actif" name="Actif" type="checkbox" value="true" checked="@Model.Actif" />
+                    <span class="champ__aide">Décoché, la personne ne peut plus se connecter.</span>
+                </div>
+            }
+        </div>
+    </section>
+
+    <div class="formulaire__actions">
+        <button type="submit" class="btn btn--plein">@(creation ? "Créer le compte" : "Enregistrer")</button>
+        <a asp-action="Index" class="btn btn--lien">Annuler</a>
+    </div>
+</form>

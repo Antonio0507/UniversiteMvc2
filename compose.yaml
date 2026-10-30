@@ -1,0 +1,60 @@
+# Une installation = un établissement. Copier .env.example vers .env, le remplir, puis : docker compose up -d --build
+services:
+  base:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: gestion_universitaire
+      MARIADB_USER: universite
+      MARIADB_PASSWORD: ${BASE_MOT_DE_PASSE:?à définir dans .env}
+      MARIADB_ROOT_PASSWORD: ${BASE_MOT_DE_PASSE_ROOT:?à définir dans .env}
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - base:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  application:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      base:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__DefaultConnection: "Server=base;Port=3306;Database=gestion_universitaire;User=universite;Password=${BASE_MOT_DE_PASSE}"
+      ReverseProxy__Actif: "true"
+      AllowedHosts: ${DOMAINE:?à définir dans .env}
+      Admin__Email: ${ADMIN_EMAIL:?à définir dans .env}
+      Etablissement__Nom: ${ETABLISSEMENT_NOM:?à définir dans .env}
+      Etablissement__Service: ${ETABLISSEMENT_SERVICE:-Service de la scolarité}
+      Etablissement__Adresse: ${ETABLISSEMENT_ADRESSE:-}
+      Etablissement__Ville: ${ETABLISSEMENT_VILLE:-}
+      Etablissement__Telephone: ${ETABLISSEMENT_TELEPHONE:-}
+    volumes:
+      - cles:/donnees/cles
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # HTTPS automatique (certificat Let's Encrypt) ; le domaine doit pointer sur ce serveur
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - application
+    command: caddy reverse-proxy --from ${DOMAINE} --to application:8080
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy:/data
+
+volumes:
+  base:
+  cles:
+  caddy:

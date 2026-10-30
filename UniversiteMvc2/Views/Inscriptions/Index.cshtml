@@ -1,0 +1,80 @@
+@model ListePaginee<Inscription>
+@{
+    ViewData["Title"] = "Inscriptions";
+    var q = ViewData["q"] as string;
+    var annees = (SelectList)ViewData["AnneeId"]!;
+    var filieres = (SelectList)ViewData["FiliereId"]!;
+    var statuts = (SelectList)ViewData["Statut"]!;
+    var filtre = Context.Request.Query.Keys.Any(k => k != "page" && !string.IsNullOrEmpty(Context.Request.Query[k]));
+}
+
+<header class="entete">
+    <div>
+        <h1>Inscriptions</h1>
+        <p class="entete__resume">@Formats.Pluriel(Model.Total, "inscription") @(filtre ? "correspondent aux filtres" : "au total")</p>
+    </div>
+    <div class="entete__actions">
+        <a asp-action="Exporter" asp-all-route-data="@Context.Request.Query.Where(k => k.Key != "page").ToDictionary(k => k.Key, k => k.Value.ToString())" class="btn">Exporter (CSV)</a>
+        <a asp-action="Create" class="btn btn--plein">Nouvelle inscription</a>
+    </div>
+</header>
+
+<form method="get" class="filtres" role="search">
+    <label class="filtres__recherche">
+        <span class="sr">Rechercher un étudiant</span>
+        <input type="search" name="q" value="@q" placeholder="Étudiant ou matricule" data-recherche />
+        <kbd>/</kbd>
+    </label>
+    <label class="sr" for="anneeId">Année</label>
+    <select id="anneeId" name="anneeId" asp-items="annees"><option value="">Toutes les années</option></select>
+    <label class="sr" for="filiereId">Filière</label>
+    <select id="filiereId" name="filiereId" asp-items="filieres"><option value="">Toutes les filières</option></select>
+    <label class="sr" for="statut">Statut</label>
+    <select id="statut" name="statut" asp-items="statuts"><option value="">Tous les statuts</option></select>
+    <button class="btn" type="submit">Filtrer</button>
+    @if (filtre)
+    {
+        <a asp-action="Index" class="btn btn--lien">Effacer</a>
+    }
+</form>
+
+@if (Model.Total == 0)
+{
+    <p class="vide">Aucune inscription ne correspond. <a asp-action="Create">Inscrire un étudiant</a></p>
+}
+else
+{
+    <div class="defilement">
+        <table class="registre">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Étudiant</th>
+                    <th>Filière · niveau</th>
+                    <th>Année</th>
+                    <th>Statut</th>
+                    <th class="num">Versé</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var i in Model.Elements)
+                {
+                    <tr>
+                        <td class="num" style="text-align: left">@Formats.Date(i.DateInscription)</td>
+                        <td>
+                            <a asp-action="Details" asp-route-id="@i.Id" class="lien-fort">@i.Etudiant?.NomComplet</a>
+                            <span class="mono discret masquer-etroit">@i.Etudiant?.Matricule</span>
+                        </td>
+                        <td class="mono">@i.Filiere?.Code · @i.Niveau?.Code</td>
+                        <td class="mono">@i.AnneeAcad?.Libelle</td>
+                        <td><span class="statut" data-statut="@i.Statut">@i.Statut</span></td>
+                        <td class="num">@Formats.Montant(i.Paiements.Sum(p => p.Montant))</td>
+                        <td class="actions"><a asp-action="Edit" asp-route-id="@i.Id">Modifier</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pagination" model="Model" />
+}

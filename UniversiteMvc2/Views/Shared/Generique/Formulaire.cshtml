@@ -1,0 +1,59 @@
+@* Formulaire généré à partir du modèle : un groupe par [Display(GroupName)], un <champ> par propriété modifiable.
+   Les listes déroulantes viennent de ViewData[nom de la propriété]. *@
+@model object
+@inject Modeles Modeles
+@inject Microsoft.AspNetCore.Mvc.ModelBinding.IModelMetadataProvider Metadonnees
+@{
+    var d = Modeles.Decrire(Model.GetType());
+    var id = Libelles.Id(Model) ?? 0;
+    var creation = id == 0;
+    var titre = creation ? d.Entite.Nouveau : $"Modifier {d.Entite.Le}";
+    ViewData["Title"] = titre;
+    var explorateur = Metadonnees.GetModelExplorerForType(Model.GetType(), Model);
+}
+
+<header class="entete">
+    <div>
+        <h1>@titre</h1>
+        @if (!creation)
+        {
+            <p class="entete__resume">@Libelles.Texte(Model)</p>
+        }
+    </div>
+</header>
+
+<form asp-action="@(creation ? "Create" : "Edit")" asp-route-id="@(creation ? null : (int?)id)" class="formulaire">
+    <div asp-validation-summary="ModelOnly" class="resume-erreurs"></div>
+
+    @foreach (var groupe in d.Groupes)
+    {
+        <section class="groupe">
+            <div>
+                <h2 class="groupe__titre">@groupe.Nom</h2>
+                @if (groupe.Note != null)
+                {
+                    <p class="groupe__note">@groupe.Note</p>
+                }
+            </div>
+            <div class="grille-champs">
+                @foreach (var champ in groupe.Champs)
+                {
+                    var liste = ViewData[champ.Nom] as IEnumerable<SelectListItem>;
+                    var obligatoire = champ.Metadonnees.IsRequired;
+                    // Option vide pour les clés étrangères et les listes facultatives
+                    var vide = liste != null && (champ.Cible != null || !obligatoire) ? (obligatoire ? "— Choisir —" : "— Aucun —") : null;
+                    <champ pour="explorateur.GetExplorerForProperty(champ.Nom)" asp-items="liste" vide="@vide" class="@(champ.Large ? "champ--large" : null)" />
+                }
+            </div>
+        </section>
+    }
+
+    <div class="formulaire__actions">
+        <button type="submit" class="btn btn--plein">@(creation ? $"Créer {d.Entite.Le}" : "Enregistrer")</button>
+        <a asp-action="@(creation ? "Index" : "Details")" asp-route-id="@(creation ? null : (int?)id)" class="btn btn--lien">Annuler</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/*.db
+.git
+.env
+sauvegardes/
+UniversiteMvc2.Tests/

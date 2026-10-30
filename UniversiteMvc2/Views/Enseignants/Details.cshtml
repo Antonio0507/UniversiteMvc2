@@ -1,0 +1,57 @@
+@model Enseignant
+@{
+    ViewData["Title"] = Model.NomComplet;
+    var cours = Model.Cours.OrderBy(c => c.UE?.Code).ToList();
+}
+
+<header class="entete">
+    <div>
+        <p class="entete__sur">@(Model.Grade ?? "Enseignant")</p>
+        <h1>@Model.Nom <span class="leger">@Model.Prenom</span></h1>
+    </div>
+    <div class="entete__actions">
+        <a asp-controller="Cours" asp-action="Create" asp-route-enseignantId="@Model.Id" class="btn btn--plein">Attribuer un cours</a>
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn">Modifier</a>
+        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn--danger">Supprimer</a>
+    </div>
+</header>
+
+<dl class="fiche">
+    <div><dt>E-mail</dt><dd><a href="mailto:@Model.Email">@Model.Email</a></dd></div>
+    <div><dt>Téléphone</dt><dd>@(Model.Telephone ?? "—")</dd></div>
+    <div><dt>Spécialité</dt><dd>@(Model.Specialite ?? "—")</dd></div>
+    <div><dt>Charge horaire</dt><dd class="grand">@cours.Sum(c => c.VolumeHoraire) h</dd></div>
+</dl>
+
+<section class="bloc">
+    <div class="bloc__tete">
+        <h2 class="bloc__titre">Cours assurés <span class="bloc__compte">@cours.Count</span></h2>
+    </div>
+    @if (cours.Count == 0)
+    {
+        <p class="vide">Aucun cours attribué.</p>
+    }
+    else
+    {
+        <div class="defilement">
+            <table class="registre">
+                <thead>
+                    <tr><th>UE</th><th>Cours</th><th>Filière · niveau</th><th class="num">Volume</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in cours)
+                    {
+                        <tr>
+                            <td class="mono"><a asp-controller="UEs" asp-action="Details" asp-route-id="@c.UEId">@c.UE?.Code</a></td>
+                            <td><a class="lien-fort" asp-controller="Cours" asp-action="Details" asp-route-id="@c.Id">@c.Intitule</a></td>
+                            <td class="mono">@c.UE?.Filiere?.Code · @c.UE?.Niveau?.Code</td>
+                            <td class="num">@c.VolumeHoraire h</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+<a class="retour" asp-action="Index">← Tous les enseignants</a>

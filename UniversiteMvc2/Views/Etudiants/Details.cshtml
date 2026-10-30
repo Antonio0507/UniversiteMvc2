@@ -1,0 +1,60 @@
+@model Etudiant
+@{
+    ViewData["Title"] = Model.NomComplet;
+    var verse = Model.Inscriptions.SelectMany(i => i.Paiements).Sum(p => p.Montant);
+    var parcours = Model.Inscriptions.OrderByDescending(i => i.AnneeAcad?.DateDebut).ToList();
+}
+
+<header class="entete">
+    <div>
+        <p class="entete__sur mono">@Model.Matricule</p>
+        <h1>@Model.Nom <span class="leger">@Model.Prenom</span></h1>
+    </div>
+    <div class="entete__actions">
+        <a asp-controller="Inscriptions" asp-action="Create" asp-route-etudiantId="@Model.Id" class="btn btn--plein">Inscrire</a>
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn">Modifier</a>
+        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn--danger">Supprimer</a>
+    </div>
+</header>
+
+<dl class="fiche">
+    <div><dt>E-mail</dt><dd><a href="mailto:@Model.Email">@Model.Email</a></dd></div>
+    <div><dt>Téléphone</dt><dd>@(Model.Telephone ?? "—")</dd></div>
+    <div><dt>Date de naissance</dt><dd>@Formats.DateLongue(Model.DateNaissance) <span class="discret">· @Formats.Age(Model.DateNaissance) ans</span></dd></div>
+    <div><dt>Total versé</dt><dd class="grand">@Formats.Montant(verse)</dd></div>
+</dl>
+
+<section class="bloc">
+    <div class="bloc__tete">
+        <h2 class="bloc__titre">Parcours <span class="bloc__compte">@parcours.Count</span></h2>
+    </div>
+    @if (parcours.Count == 0)
+    {
+        <p class="vide">Aucune inscription. <a asp-controller="Inscriptions" asp-action="Create" asp-route-etudiantId="@Model.Id">Inscrire cet étudiant</a></p>
+    }
+    else
+    {
+        <div class="defilement">
+            <table class="registre">
+                <thead>
+                    <tr><th>Année</th><th>Filière</th><th>Niveau</th><th>Statut</th><th class="num">Versé</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var i in parcours)
+                    {
+                        <tr>
+                            <td class="mono">@i.AnneeAcad?.Libelle</td>
+                            <td>@i.Filiere?.Nom</td>
+                            <td>@i.Niveau?.Libelle</td>
+                            <td><span class="statut" data-statut="@i.Statut">@i.Statut</span></td>
+                            <td class="num">@Formats.Montant(i.Paiements.Sum(p => p.Montant))</td>
+                            <td class="actions"><a asp-controller="Inscriptions" asp-action="Details" asp-route-id="@i.Id">Ouvrir</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+<a class="retour" asp-action="Index">← Tous les étudiants</a>

@@ -1,0 +1,30 @@
+@{
+    ViewData["Title"] = "Connexion";
+}
+
+<div class="connexion">
+    <header class="entete">
+        <div>
+            <h1>Connexion</h1>
+            <p class="entete__resume">Accès réservé au personnel de l'établissement.</p>
+        </div>
+    </header>
+
+    <form asp-action="Index" asp-route-retour="@ViewData["retour"]" method="post" class="formulaire">
+        <div asp-validation-summary="ModelOnly" class="resume-erreurs"></div>
+
+        <div class="champ">
+            <label class="champ__libelle" for="email">E-mail</label>
+            <input class="champ__controle" id="email" name="email" type="email" value="@ViewData["email"]" autocomplete="username" required autofocus />
+        </div>
+        <div class="champ">
+            <label class="champ__libelle" for="motDePasse">Mot de passe</label>
+            <input class="champ__controle" id="motDePasse" name="motDePasse" type="password" autocomplete="current-password" required />
+            <span class="champ__aide">Mot de passe oublié ? Un administrateur peut le réinitialiser.</span>
+        </div>
+
+        <div class="formulaire__actions">
+            <button type="submit" class="btn btn--plein">Se connecter</button>
+        </div>
+    </form>
+</div>

@@ -1,0 +1,56 @@
+@model Paiement
+@inject Microsoft.Extensions.Options.IOptions<Etablissement> Etablissement
+@{
+    var inscription = Model.Inscription!;
+    ViewData["Title"] = $"Reçu {Formats.NumeroRecu(Model.Id)}";
+    var cumul = inscription.Paiements.Where(p => p.DatePaiement < Model.DatePaiement || (p.DatePaiement == Model.DatePaiement && p.Id <= Model.Id)).Sum(p => p.Montant);
+}
+
+<header class="entete">
+    <div>
+        <h1>Reçu de paiement</h1>
+        <p class="entete__resume">À imprimer directement, ou à télécharger au format PDF.</p>
+    </div>
+    <div class="entete__actions">
+        <a asp-controller="Documents" asp-action="Telecharger" asp-route-type="@TypeDocument.RecuPaiement" asp-route-id="@Model.Id" class="btn btn--plein">Reçu PDF</a>
+        <button type="button" class="btn" data-imprimer>Imprimer</button>
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn">Modifier</a>
+        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn--danger">Supprimer</a>
+    </div>
+</header>
+
+<article class="recu">
+    <div class="recu__tete">
+        <div>
+            <p class="marque__nom">@Etablissement.Value.Nom</p>
+            <p class="etiquette" style="margin-top: var(--e-2)">Service de la scolarité</p>
+        </div>
+        <div style="text-align: right">
+            <p class="etiquette">Reçu n°</p>
+            <p class="mono" style="font-size: var(--t-l)">@Formats.NumeroRecu(Model.Id)</p>
+        </div>
+    </div>
+
+    <p class="etiquette" style="margin-top: var(--e-6)">Reçu de</p>
+    <p style="font: 600 var(--t-xl)/1.2 var(--police-titre); margin-top: var(--e-2)">@inscription.Etudiant?.NomComplet</p>
+    <p class="discret mono">@inscription.Etudiant?.Matricule</p>
+
+    <p class="recu__montant">@Formats.Montant(Model.Montant)</p>
+    <p class="discret">versés le @Formats.DateLongue(Model.DatePaiement) · @Model.Mode</p>
+
+    <dl class="fiche">
+        <div><dt>Année académique</dt><dd class="mono">@inscription.AnneeAcad?.Libelle</dd></div>
+        <div><dt>Filière</dt><dd>@inscription.Filiere?.Nom</dd></div>
+        <div><dt>Niveau</dt><dd>@inscription.Niveau?.Libelle</dd></div>
+        <div><dt>Cumul versé à cette date</dt><dd>@Formats.Montant(cumul)</dd></div>
+    </dl>
+
+    <div class="recu__pied">
+        <span>Édité le @Formats.DateLongue(DateTime.Today)</span>
+        <span class="signature">Cachet et signature</span>
+    </div>
+</article>
+
+<p style="margin-top: var(--e-5)">
+    <a class="retour" asp-controller="Inscriptions" asp-action="Details" asp-route-id="@Model.InscriptionId">← Retour à l'inscription</a>
+</p>

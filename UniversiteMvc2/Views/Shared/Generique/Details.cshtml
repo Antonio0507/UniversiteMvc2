@@ -1,0 +1,100 @@
+@* Fiche générée à partir du modèle : propriétés, puis un tableau par collection liée *@
+@model object
+@inject Modeles Modeles
+@{
+    var d = Modeles.Decrire(Model.GetType());
+    var id = Libelles.Id(Model);
+    var titre = Libelles.Texte(Model);
+    ViewData["Title"] = titre;
+
+    async Task Valeur(object element, Colonne colonne, bool principale, string? controleurElement)
+    {
+        var valeur = colonne.Lire(element);
+        var texte = Libelles.Valeur(valeur, colonne.Metadonnees);
+        var controleur = colonne.Reference != null && valeur != null ? Navigation.ControleurDe(colonne.Reference) : null;
+        if (principale && controleurElement != null)
+        {
+            <a asp-controller="@controleurElement" asp-action="Details" asp-route-id="@Libelles.Id(element)" class="lien-fort">@texte</a>
+        }
+        else if (controleur != null)
+        {
+            <a asp-controller="@controleur" asp-action="Details" asp-route-id="@Libelles.Id(valeur!)">@texte</a>
+        }
+        else
+        {
+            @texte
+        }
+    }
+}
+
+<header class="entete">
+    <div>
+        <p class="entete__sur">@Libelles.Majuscule(d.Entite.Singulier)</p>
+        <h1>@titre</h1>
+    </div>
+    <div class="entete__actions">
+        <a asp-action="Edit" asp-route-id="@id" class="btn">Modifier</a>
+        <a asp-action="Delete" asp-route-id="@id" class="btn btn--danger">Supprimer</a>
+    </div>
+</header>
+
+<dl class="fiche">
+    @foreach (var c in d.Colonnes)
+    {
+        <div>
+            <dt>@c.Libelle</dt>
+            <dd class="@(Libelles.EstCode(c.Nom) ? "mono" : null)">@{ await Valeur(Model, c, false, null); }</dd>
+        </div>
+    }
+    @foreach (var collection in d.Collections)
+    {
+        <div><dt>@collection.Libelle</dt><dd class="grand">@collection.Lire(Model).Count</dd></div>
+    }
+</dl>
+
+@foreach (var collection in d.Collections)
+{
+    var cible = Modeles.Decrire(collection.Cible);
+    var elements = collection.Lire(Model);
+    var colonnes = cible.Colonnes.Where(c => c.Nom != collection.Inverse).Take(5).ToList();
+    var controleur = Navigation.ControleurDe(collection.Cible);
+
+    <section class="bloc">
+        <div class="bloc__tete">
+            <h2 class="bloc__titre">@collection.Libelle <span class="bloc__compte">@elements.Count</span></h2>
+        </div>
+        @if (elements.Count == 0)
+        {
+            <p class="vide">Aucun élément.</p>
+        }
+        else
+        {
+            <div class="defilement">
+                <table class="registre">
+                    <thead>
+                        <tr>
+                            @foreach (var c in colonnes)
+                            {
+                                <th class="@(Libelles.EstNumerique(c.Type) ? "num" : null)">@c.Libelle</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var element in elements)
+                        {
+                            <tr>
+                                @for (var i = 0; i < colonnes.Count; i++)
+                                {
+                                    var c = colonnes[i];
+                                    <td class="@(Libelles.EstNumerique(c.Type) ? "num" : Libelles.EstCode(c.Nom) ? "mono" : null)">@{ await Valeur(element, c, i == 0, controleur); }</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+}
+
+<a class="retour" asp-action="Index">← @Libelles.Majuscule(d.Entite.Tous)</a>

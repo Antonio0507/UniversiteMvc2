@@ -1,0 +1,49 @@
+@model List<Filiere>
+@{
+    ViewData["Title"] = "Filières";
+}
+
+<header class="entete">
+    <div>
+        <h1>Filières</h1>
+        <p class="entete__resume">@Formats.Pluriel(Model.Count, "filière") ouverte@(Model.Count > 1 ? "s" : "")</p>
+    </div>
+    <div class="entete__actions">
+        <a asp-action="Create" class="btn btn--plein">Nouvelle filière</a>
+    </div>
+</header>
+
+@if (Model.Count == 0)
+{
+    <p class="vide">Aucune filière. <a asp-action="Create">Créer la première</a></p>
+}
+else
+{
+    <div class="defilement">
+        <table class="registre">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Intitulé</th>
+                    <th class="num">UE</th>
+                    <th class="num">Crédits</th>
+                    <th class="num">Inscriptions</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var f in Model)
+                {
+                    <tr>
+                        <td class="mono">@f.Code</td>
+                        <td><a asp-action="Details" asp-route-id="@f.Id" class="lien-fort">@f.Nom</a></td>
+                        <td class="num">@f.UEs.Count</td>
+                        <td class="num">@f.UEs.Sum(u => u.Credits)</td>
+                        <td class="num">@f.Inscriptions.Count</td>
+                        <td class="actions"><a asp-action="Edit" asp-route-id="@f.Id">Modifier</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

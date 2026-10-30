@@ -1,0 +1,68 @@
+@model AnneeAcad
+@{
+    ViewData["Title"] = $"Année {Model.Libelle}";
+    var encaisse = Model.Inscriptions.SelectMany(i => i.Paiements).Sum(p => p.Montant);
+    var parFiliere = Model.Inscriptions
+        .GroupBy(i => i.Filiere)
+        .OrderBy(g => g.Key?.Code)
+        .ToList();
+}
+
+<header class="entete">
+    <div>
+        <p class="entete__sur">Du @Formats.DateLongue(Model.DateDebut) au @Formats.DateLongue(Model.DateFin)</p>
+        <h1>Année <span class="mono">@Model.Libelle</span></h1>
+    </div>
+    <div class="entete__actions">
+        <a asp-controller="Home" asp-action="Index" asp-route-annee="@Model.Id" class="btn btn--plein">Tableau de bord</a>
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn">Modifier</a>
+        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn--danger">Supprimer</a>
+    </div>
+</header>
+
+<dl class="fiche">
+    <div><dt>Inscriptions</dt><dd class="grand">@Model.Inscriptions.Count</dd></div>
+    <div><dt>Validées</dt><dd class="grand">@Model.Inscriptions.Count(i => i.Statut == Inscription.Validee)</dd></div>
+    <div><dt>En attente</dt><dd class="grand">@Model.Inscriptions.Count(i => i.Statut == Inscription.EnAttente)</dd></div>
+    <div><dt>Encaissé</dt><dd class="grand">@Formats.Montant(encaisse)</dd></div>
+</dl>
+
+<section class="bloc">
+    <div class="bloc__tete">
+        <h2 class="bloc__titre">Effectifs par filière</h2>
+        <a asp-controller="Inscriptions" asp-action="Index" asp-route-anneeId="@Model.Id" class="discret">Toutes les inscriptions</a>
+    </div>
+    @if (parFiliere.Count == 0)
+    {
+        <p class="vide">Aucune inscription sur cette année.</p>
+    }
+    else
+    {
+        <table class="registre">
+            <thead>
+                <tr><th>Filière</th><th class="num">Inscrits</th><th class="num">Validés</th><th class="num">Encaissé</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var g in parFiliere)
+                {
+                    <tr>
+                        <td><a asp-controller="Inscriptions" asp-action="Index" asp-route-anneeId="@Model.Id" asp-route-filiereId="@g.Key?.Id" class="lien-fort">@g.Key?.Nom</a></td>
+                        <td class="num">@g.Count()</td>
+                        <td class="num">@g.Count(i => i.Statut == Inscription.Validee)</td>
+                        <td class="num">@Formats.Montant(g.SelectMany(i => i.Paiements).Sum(p => p.Montant))</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td>Total</td>
+                    <td class="num">@Model.Inscriptions.Count</td>
+                    <td class="num">@Model.Inscriptions.Count(i => i.Statut == Inscription.Validee)</td>
+                    <td class="num">@Formats.Montant(encaisse)</td>
+                </tr>
+            </tfoot>
+        </table>
+    }
+</section>
+
+<a class="retour" asp-action="Index">← Toutes les années</a>

@@ -1,0 +1,98 @@
+@* Liste générée à partir du modèle : colonnes = propriétés affichables, puis nombre d'éléments liés *@
+@model IListePaginee
+@inject Modeles Modeles
+@{
+    var d = Modeles.Decrire(Model.TypeElement);
+    var titre = Navigation.Courante(ViewContext)?.Titre ?? Libelles.Majuscule(d.Entite.Pluriel);
+    ViewData["Title"] = titre;
+    var q = ViewData["q"] as string;
+    var colonnes = d.Colonnes.Take(6).ToList();
+
+    async Task Cellule(object element, Colonne colonne, bool principale)
+    {
+        var valeur = colonne.Lire(element);
+        var texte = Libelles.Valeur(valeur, colonne.Metadonnees);
+        var controleur = colonne.Reference != null && valeur != null ? Navigation.ControleurDe(colonne.Reference) : null;
+        if (principale)
+        {
+            <a asp-action="Details" asp-route-id="@Libelles.Id(element)" class="lien-fort">@texte</a>
+        }
+        else if (controleur != null)
+        {
+            <a asp-controller="@controleur" asp-action="Details" asp-route-id="@Libelles.Id(valeur!)">@texte</a>
+        }
+        else
+        {
+            @texte
+        }
+    }
+}
+
+<header class="entete">
+    <div>
+        <h1>@titre</h1>
+        <p class="entete__resume">@Formats.Pluriel(Model.Total, d.Entite.Singulier, d.Entite.Pluriel)@(string.IsNullOrEmpty(q) ? "" : $" pour « {q} »")</p>
+    </div>
+    <div class="entete__actions">
+        <a asp-action="Create" class="btn btn--plein">@d.Entite.Nouveau</a>
+    </div>
+</header>
+
+@if (d.Recherchable)
+{
+    <form method="get" class="filtres" role="search">
+        <label class="filtres__recherche">
+            <span class="sr">Rechercher</span>
+            <input type="search" name="q" value="@q" placeholder="Rechercher dans @d.Entite.Tous.ToLowerInvariant()" data-recherche />
+            <kbd>/</kbd>
+        </label>
+        <button class="btn" type="submit">Rechercher</button>
+        @if (!string.IsNullOrEmpty(q))
+        {
+            <a asp-action="Index" class="btn btn--lien">Effacer</a>
+        }
+    </form>
+}
+
+@if (Model.Total == 0)
+{
+    <p class="vide">Aucun élément@(string.IsNullOrEmpty(q) ? "" : " ne correspond"). <a asp-action="Create">@d.Entite.Nouveau</a></p>
+}
+else
+{
+    <div class="defilement">
+        <table class="registre">
+            <thead>
+                <tr>
+                    @foreach (var c in colonnes)
+                    {
+                        <th class="@(Libelles.EstNumerique(c.Type) ? "num" : null)">@c.Libelle</th>
+                    }
+                    @foreach (var collection in d.Collections)
+                    {
+                        <th class="num">@collection.Libelle</th>
+                    }
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var element in Model.Elements)
+                {
+                    <tr>
+                        @for (var i = 0; i < colonnes.Count; i++)
+                        {
+                            var c = colonnes[i];
+                            <td class="@(Libelles.EstNumerique(c.Type) ? "num" : Libelles.EstCode(c.Nom) ? "mono" : null)">@{ await Cellule(element, c, i == 0); }</td>
+                        }
+                        @foreach (var collection in d.Collections)
+                        {
+                            <td class="num">@collection.Lire(element).Count</td>
+                        }
+                        <td class="actions"><a asp-action="Edit" asp-route-id="@Libelles.Id(element)">Modifier</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pagination" model="Model" />
+}

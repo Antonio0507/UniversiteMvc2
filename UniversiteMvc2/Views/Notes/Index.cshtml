@@ -1,0 +1,73 @@
+@model List<UniversiteMvc2.Controllers.LigneNote>
+@{
+    ViewData["Title"] = "Notes";
+    var ue = ViewData["ue"] as UE;
+    var anneeId = ViewData["anneeChoisie"] as int?;
+    var peutSaisir = Droits.PeutEcrire(User, "Notes");
+    var annees = (SelectList)ViewData["AnneeId"]!;
+    var listeUes = (IEnumerable<SelectListItem>)ViewData["UEId"]!;
+    string Valeur(decimal? note) => note?.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) ?? "";
+}
+
+<header class="entete">
+    <div>
+        <h1>Notes</h1>
+        <p class="entete__resume">Choisissez une année et une UE. Seuls les étudiants à l'inscription validée, dans la filière et le niveau de l'UE, apparaissent.</p>
+    </div>
+</header>
+
+<form method="get" class="filtres">
+    <label class="sr" for="anneeId">Année</label>
+    <select id="anneeId" name="anneeId" asp-items="annees"></select>
+    <label class="sr" for="ueId">Unité d'enseignement</label>
+    <select id="ueId" name="ueId" asp-items="listeUes"><option value="">— Choisir une UE —</option></select>
+    <button class="btn" type="submit">Afficher</button>
+</form>
+
+@if (ue != null)
+{
+    if (Model.Count == 0)
+    {
+        <p class="vide">Aucune inscription validée pour cette UE sur cette année.</p>
+    }
+    else
+    {
+        <form asp-action="Index" asp-route-anneeId="@anneeId" asp-route-ueId="@ue.Id" method="post">
+            <div asp-validation-summary="ModelOnly" class="resume-erreurs"></div>
+            <div class="defilement">
+                <table class="registre">
+                    <thead>
+                        <tr>
+                            <th>Matricule</th>
+                            <th>Étudiant</th>
+                            <th class="num">Session normale</th>
+                            <th class="num">Rattrapage</th>
+                            <th class="num">Retenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var i = 0; i < Model.Count; i++)
+                        {
+                            var ligne = Model[i];
+                            <tr>
+                                <td class="mono">@ligne.Inscription.Etudiant?.Matricule</td>
+                                <td><a asp-controller="Inscriptions" asp-action="Details" asp-route-id="@ligne.Inscription.Id" class="lien-fort">@ligne.Inscription.Etudiant?.NomComplet</a></td>
+                                <td class="num">
+                                    <input type="hidden" name="lignes[@i].InscriptionId" value="@ligne.Inscription.Id" />
+                                    <input class="saisie-note" type="number" name="lignes[@i].Valeur" value="@Valeur(ligne.Valeur)" min="0" max="20" step="0.25" aria-label="Session normale, @ligne.Inscription.Etudiant?.NomComplet" readonly="@(!peutSaisir)" />
+                                </td>
+                                <td class="num">
+                                    <input class="saisie-note" type="number" name="lignes[@i].Rattrapage" value="@Valeur(ligne.Rattrapage)" min="0" max="20" step="0.25" aria-label="Rattrapage, @ligne.Inscription.Etudiant?.NomComplet" readonly="@(!peutSaisir)" />
+                                </td>
+                                <td class="num">@Formats.Note(ligne.Retenue)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="formulaire__actions">
+                <button type="submit" class="btn btn--plein">Enregistrer les notes</button>
+            </div>
+        </form>
+    }
+}

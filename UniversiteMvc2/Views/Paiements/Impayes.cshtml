@@ -1,0 +1,61 @@
+@model List<LigneImpaye>
+@{
+    ViewData["Title"] = "Impayés";
+    var annee = ViewData["annee"] as AnneeAcad;
+    var annees = (SelectList)ViewData["AnneeId"]!;
+}
+
+<header class="entete">
+    <div>
+        <h1>Impayés</h1>
+        <p class="entete__resume">@Formats.Pluriel(Model.Count, "inscription") · <strong>@Formats.Montant(Model.Sum(l => l.Reste))</strong> restant à encaisser. Inscriptions validées dont le cursus a un tarif.</p>
+    </div>
+    <div class="entete__actions">
+        <a asp-action="ExporterImpayes" asp-route-anneeId="@annee?.Id" class="btn">Exporter (CSV)</a>
+        <a asp-controller="Tarifs" asp-action="Index" class="btn">Tarifs</a>
+    </div>
+</header>
+
+<form method="get" class="filtres">
+    <label class="sr" for="anneeId">Année</label>
+    <select id="anneeId" name="anneeId" asp-items="annees"></select>
+    <noscript><button class="btn" type="submit">Afficher</button></noscript>
+</form>
+
+@if (Model.Count == 0)
+{
+    <p class="vide">Aucun impayé sur cette année. Vérifiez que les <a asp-controller="Tarifs" asp-action="Index">tarifs</a> sont renseignés.</p>
+}
+else
+{
+    <div class="defilement">
+        <table class="registre">
+            <thead>
+                <tr>
+                    <th>Étudiant</th>
+                    <th>Filière · niveau</th>
+                    <th class="num">Dû</th>
+                    <th class="num">Versé</th>
+                    <th class="num">Reste</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var l in Model)
+                {
+                    <tr>
+                        <td>
+                            <a asp-controller="Inscriptions" asp-action="Details" asp-route-id="@l.Inscription.Id" class="lien-fort">@l.Inscription.Etudiant?.NomComplet</a>
+                            <span class="mono discret masquer-etroit">@l.Inscription.Etudiant?.Matricule</span>
+                        </td>
+                        <td class="mono">@l.Inscription.Filiere?.Code · @l.Inscription.Niveau?.Code</td>
+                        <td class="num">@Formats.Montant(l.Du)</td>
+                        <td class="num">@Formats.Montant(l.Verse)</td>
+                        <td class="num">@Formats.Montant(l.Reste)</td>
+                        <td class="actions"><a asp-action="Create" asp-route-inscriptionId="@l.Inscription.Id">Encaisser</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

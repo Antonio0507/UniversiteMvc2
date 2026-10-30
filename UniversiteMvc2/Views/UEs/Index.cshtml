@@ -1,0 +1,72 @@
+@model List<UE>
+@{
+    ViewData["Title"] = "Unités d'enseignement";
+    var q = ViewData["q"] as string;
+    var filieres = (SelectList)ViewData["FiliereId"]!;
+    var niveaux = (SelectList)ViewData["NiveauId"]!;
+    var filtre = !string.IsNullOrEmpty(q) || Context.Request.Query.ContainsKey("filiereId") || Context.Request.Query.ContainsKey("niveauId");
+}
+
+<header class="entete">
+    <div>
+        <h1>Unités d'enseignement</h1>
+        <p class="entete__resume">@Formats.Pluriel(Model.Count, "UE", "UE") · @Model.Sum(u => u.Credits) crédits · @Model.SelectMany(u => u.Cours).Sum(c => c.VolumeHoraire) h de cours</p>
+    </div>
+    <div class="entete__actions">
+        <a asp-action="Create" class="btn btn--plein">Nouvelle UE</a>
+    </div>
+</header>
+
+<form method="get" class="filtres" role="search">
+    <label class="filtres__recherche">
+        <span class="sr">Rechercher une UE</span>
+        <input type="search" name="q" value="@q" placeholder="Code ou intitulé" data-recherche />
+        <kbd>/</kbd>
+    </label>
+    <label class="sr" for="filiereId">Filière</label>
+    <select id="filiereId" name="filiereId" asp-items="filieres"><option value="">Toutes les filières</option></select>
+    <label class="sr" for="niveauId">Niveau</label>
+    <select id="niveauId" name="niveauId" asp-items="niveaux"><option value="">Tous les niveaux</option></select>
+    <button class="btn" type="submit">Filtrer</button>
+    @if (filtre)
+    {
+        <a asp-action="Index" class="btn btn--lien">Effacer</a>
+    }
+</form>
+
+@if (Model.Count == 0)
+{
+    <p class="vide">Aucune unité d'enseignement ne correspond. <a asp-action="Create">Créer une UE</a></p>
+}
+else
+{
+    <div class="defilement">
+        <table class="registre">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Intitulé</th>
+                    <th>Filière · niveau</th>
+                    <th class="num">Crédits</th>
+                    <th class="num">Cours</th>
+                    <th class="num">Heures</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var u in Model)
+                {
+                    <tr>
+                        <td class="mono">@u.Code</td>
+                        <td><a asp-action="Details" asp-route-id="@u.Id" class="lien-fort">@u.Intitule</a></td>
+                        <td class="mono">@u.Filiere?.Code · @u.Niveau?.Code</td>
+                        <td class="num">@u.Credits</td>
+                        <td class="num">@u.Cours.Count</td>
+                        <td class="num">@u.Cours.Sum(c => c.VolumeHoraire) h</td>
+                        <td class="actions"><a asp-action="Edit" asp-route-id="@u.Id">Modifier</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

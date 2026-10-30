@@ -1,0 +1,129 @@
+@model Inscription
+@{
+    ViewData["Title"] = $"Inscription — {Model.Etudiant?.NomComplet}";
+    var paiements = Model.Paiements.OrderBy(p => p.DatePaiement).ToList();
+    var autresStatuts = Inscription.Statuts.Where(s => s != Model.Statut);
+    var solde = (Solde)ViewData["solde"]!;
+    var ues = (List<UE>)ViewData["ues"]!;
+    var bilan = (Bilan)ViewData["bilan"]!;
+}
+
+<header class="entete">
+    <div>
+        <p class="entete__sur"><span class="mono">@Model.AnneeAcad?.Libelle</span> · inscription n° @Model.Id</p>
+        <h1><a asp-controller="Etudiants" asp-action="Details" asp-route-id="@Model.EtudiantId" style="text-decoration: none">@Model.Etudiant?.Nom <span class="leger">@Model.Etudiant?.Prenom</span></a></h1>
+    </div>
+    <div class="entete__actions">
+        <a asp-controller="Paiements" asp-action="Create" asp-route-inscriptionId="@Model.Id" class="btn btn--plein">Enregistrer un paiement</a>
+        @if (Model.Statut == Inscription.Validee)
+        {
+            <a asp-controller="Documents" asp-action="Telecharger" asp-route-type="@TypeDocument.AttestationInscription" asp-route-id="@Model.Id" class="btn">Attestation PDF</a>
+            <a asp-controller="Documents" asp-action="Telecharger" asp-route-type="@TypeDocument.ReleveNotes" asp-route-id="@Model.Id" class="btn">Relevé de notes PDF</a>
+        }
+        <a asp-controller="Documents" asp-action="Telecharger" asp-route-type="@TypeDocument.RelevePaiements" asp-route-id="@Model.Id" class="btn">Relevé PDF</a>
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn">Modifier</a>
+        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn--danger">Supprimer</a>
+    </div>
+</header>
+
+<dl class="fiche">
+    <div><dt>Matricule</dt><dd class="mono">@Model.Etudiant?.Matricule</dd></div>
+    <div><dt>Filière</dt><dd><a asp-controller="Filieres" asp-action="Details" asp-route-id="@Model.FiliereId">@Model.Filiere?.Nom</a></dd></div>
+    <div><dt>Niveau</dt><dd>@Model.Niveau?.Libelle</dd></div>
+    <div><dt>Inscrit le</dt><dd>@Formats.DateLongue(Model.DateInscription)</dd></div>
+    <div><dt>Frais de scolarité</dt><dd>@(solde.Du == null ? "Aucun tarif" : Formats.Montant(solde.Du.Value))</dd></div>
+    <div><dt>Versé</dt><dd>@Formats.Montant(solde.Verse)</dd></div>
+    <div><dt>Reste à payer</dt><dd class="grand">@(solde.Reste == null ? "—" : Formats.Montant(solde.Reste.Value))</dd></div>
+</dl>
+
+<section class="bloc">
+    <div class="bloc__tete">
+        <h2 class="bloc__titre">Statut</h2>
+    </div>
+    <div class="filtres" style="justify-content: space-between">
+        <span class="statut" data-statut="@Model.Statut" style="font-size: var(--t-l)">@Model.Statut</span>
+        <div class="groupe-boutons">
+            @foreach (var statut in autresStatuts)
+            {
+                <form asp-action="Statut" asp-route-id="@Model.Id" method="post">
+                    <input type="hidden" name="statut" value="@statut" />
+                    <button type="submit" class="btn">@(statut switch
+                    {
+                        Inscription.Validee => "Valider",
+                        Inscription.Annulee => "Annuler l'inscription",
+                        _ => "Remettre en attente"
+                    })</button>
+                </form>
+            }
+        </div>
+    </div>
+</section>
+
+<section class="bloc">
+    <div class="bloc__tete">
+        <h2 class="bloc__titre">Paiements <span class="bloc__compte">@paiements.Count</span></h2>
+    </div>
+    @if (paiements.Count == 0)
+    {
+        <p class="vide">Aucun paiement enregistré. <a asp-controller="Paiements" asp-action="Create" asp-route-inscriptionId="@Model.Id">Enregistrer le premier</a></p>
+    }
+    else
+    {
+        <table class="registre">
+            <thead>
+                <tr><th>Reçu</th><th>Date</th><th>Mode</th><th class="num">Montant</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var p in paiements)
+                {
+                    <tr>
+                        <td class="mono"><a asp-controller="Paiements" asp-action="Details" asp-route-id="@p.Id">@Formats.NumeroRecu(p.Id)</a></td>
+                        <td>@Formats.Date(p.DatePaiement)</td>
+                        <td>@p.Mode</td>
+                        <td class="num">@Formats.Montant(p.Montant)</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3">Total versé</td>
+                    <td class="num">@Formats.Montant(paiements.Sum(p => p.Montant))</td>
+                </tr>
+            </tfoot>
+        </table>
+    }
+</section>
+
+<section class="bloc">
+    <div class="bloc__tete">
+        <h2 class="bloc__titre">Notes <span class="bloc__compte">@Model.Notes.Count</span></h2>
+        <span class="etiquette">Moyenne @Formats.Note(bilan.Moyenne) · @bilan.CreditsValides / @bilan.CreditsTotal crédits</span>
+    </div>
+    @if (ues.Count == 0)
+    {
+        <p class="vide">Aucune UE pour cette filière et ce niveau.</p>
+    }
+    else
+    {
+        <table class="registre">
+            <thead>
+                <tr><th>UE</th><th class="num">Crédits</th><th class="num">Session normale</th><th class="num">Rattrapage</th><th class="num">Retenue</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var ue in ues)
+                {
+                    var note = Model.Notes.FirstOrDefault(n => n.UEId == ue.Id);
+                    <tr>
+                        <td><a asp-controller="Notes" asp-action="Index" asp-route-anneeId="@Model.AnneeAcadId" asp-route-ueId="@ue.Id">@ue</a></td>
+                        <td class="num">@ue.Credits</td>
+                        <td class="num">@Formats.Note(note?.Valeur)</td>
+                        <td class="num">@Formats.Note(note?.Rattrapage)</td>
+                        <td class="num">@Formats.Note(note?.Retenue)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+<a class="retour" asp-action="Index">← Toutes les inscriptions</a>

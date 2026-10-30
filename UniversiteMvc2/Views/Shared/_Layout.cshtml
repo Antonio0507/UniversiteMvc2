@@ -1,0 +1,134 @@
+﻿@inject Microsoft.Extensions.Options.IOptions<Etablissement> Etablissement
+@{
+    var courante = Navigation.Courante(ViewContext);
+    var nomEtablissement = Etablissement.Value.Nom;
+    var connecte = User.Identity?.IsAuthenticated == true;
+}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] · @nomEtablissement</title>
+    <script src="~/js/theme.js" asp-append-version="true"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <a class="evitement" href="#contenu">Aller au contenu</a>
+
+    <header class="tete" id="tete">
+        <div class="tete__int">
+            <a class="marque" asp-controller="Home" asp-action="Index">
+                <span class="marque__signe" aria-hidden="true"></span>
+                <span class="marque__nom">@nomEtablissement</span>
+            </a>
+
+            @if (connecte)
+            {
+            <nav class="tete__nav" id="barre-nav" aria-label="Sommaire">
+                <a class="tete__lien @(courante == null ? "est-actif" : null)" asp-controller="Home" asp-action="Index"
+                   aria-current="@(courante == null ? "page" : null)">Tableau de bord</a>
+
+                @foreach (var groupe in Navigation.Visibles(User).GroupBy(s => s.Groupe))
+                {
+                    var actif = groupe.Contains(courante);
+                    if (groupe.Count() == 1)
+                    {
+                        var s = groupe.First();
+                        <a class="tete__lien @(actif ? "est-actif" : null)" asp-controller="@s.Controleur" asp-action="Index"
+                           aria-current="@(actif ? "page" : null)">@s.Titre</a>
+                    }
+                    else
+                    {
+                        <details class="menu" data-menu>
+                            <summary class="tete__lien @(actif ? "est-actif" : null)">@groupe.Key</summary>
+                            <div class="menu__panneau">
+                                <p class="menu__titre">@groupe.Key</p>
+                                <ul class="menu__liste">
+                                    @foreach (var s in groupe)
+                                    {
+                                        <li>
+                                            <a class="menu__lien" asp-controller="@s.Controleur" asp-action="Index" aria-current="@(s == courante ? "page" : null)">
+                                                <span class="menu__num">@s.Numero</span>
+                                                <span>@s.Titre</span>
+                                            </a>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+                        </details>
+                    }
+                }
+            </nav>
+            }
+
+            <div class="tete__outils">
+                <button type="button" class="bascule-theme" data-bascule-theme aria-label="Basculer entre thème clair et sombre" title="Thème clair / sombre">
+                    <span aria-hidden="true"></span>
+                </button>
+                @if (connecte)
+                {
+                    <a class="btn btn--plein tete__action" asp-controller="Inscriptions" asp-action="Create">Inscrire</a>
+                    <details class="menu" data-menu>
+                        <summary class="tete__lien">@User.Identity!.Name</summary>
+                        <div class="menu__panneau">
+                            <p class="menu__titre">@User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</p>
+                            <ul class="menu__liste">
+                                <li><a class="menu__lien" asp-controller="Connexion" asp-action="MotDePasse"><span>Mot de passe</span></a></li>
+                                <li>
+                                    <form asp-controller="Connexion" asp-action="Deconnexion" method="post">
+                                        <button type="submit" class="menu__lien menu__bouton"><span>Se déconnecter</span></button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </div>
+                    </details>
+                    <button type="button" class="tete__burger" aria-expanded="false" aria-controls="barre-nav" data-bascule-menu>
+                        <span class="sr">Menu</span>
+                        <span aria-hidden="true"></span>
+                    </button>
+                }
+            </div>
+        </div>
+    </header>
+
+    <main class="page" id="contenu">
+        @if (courante != null)
+        {
+            <p class="fil">@courante.Numero — @courante.Groupe</p>
+        }
+        @RenderBody()
+    </main>
+
+    <div class="notifications" aria-live="polite">
+        @if (TempData["Succes"] is string succes)
+        {
+            <div class="message message--succes" role="status" data-auto-fermer>
+                <span>@succes</span>
+                <button type="button" class="message__fermer" aria-label="Fermer" data-fermer>×</button>
+            </div>
+        }
+        @if (TempData["Information"] is string information)
+        {
+            <div class="message message--succes" role="status">
+                <span>@information</span>
+                <button type="button" class="message__fermer" aria-label="Fermer" data-fermer>×</button>
+            </div>
+        }
+        @if (TempData["Erreur"] is string erreur)
+        {
+            <div class="message message--erreur" role="alert">
+                <span>@erreur</span>
+                <button type="button" class="message__fermer" aria-label="Fermer" data-fermer>×</button>
+            </div>
+        }
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,15 @@
+﻿@model ErrorViewModel
+@{
+    ViewData["Title"] = "Erreur";
+}
+
+<div class="erreur-page">
+    <p class="erreur-page__code">500</p>
+    <h1>Une erreur est survenue</h1>
+    <p>La demande n'a pas pu aboutir. Réessayez dans un instant ; si le problème persiste, vérifiez que la base de données est démarrée.</p>
+    @if (Model.ShowRequestId)
+    {
+        <p class="discret">Référence : <span class="mono">@Model.RequestId</span></p>
+    }
+    <a asp-controller="Home" asp-action="Index" class="btn">Retour au tableau de bord</a>
+</div>

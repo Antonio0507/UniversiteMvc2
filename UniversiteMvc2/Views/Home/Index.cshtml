@@ -1,0 +1,198 @@
+﻿@model TableauDeBord
+@using System.Globalization
+@{
+    ViewData["Title"] = "Tableau de bord";
+    var maxFiliere = Math.Max(1, Model.ParFiliere.Select(f => f.Nombre).DefaultIfEmpty(0).Max());
+    var totalStatuts = Model.ParStatut.Sum(s => s.Nombre);
+    var anneeId = Model.Annee?.Id;
+    string Pourcent(double part) => (part * 100).ToString("0.##", CultureInfo.InvariantCulture) + "%";
+}
+
+<p class="fil">Vue d'ensemble</p>
+
+<header class="entete">
+    <div>
+        <h1>Tableau de bord</h1>
+        <p class="entete__resume">
+            @if (Model.Annee == null)
+            {
+                <text>Aucune année académique n'est encore définie. <a asp-controller="AnneesAcad" asp-action="Create">Ouvrir une année</a></text>
+            }
+            else
+            {
+                <text>Année @Model.Annee.Libelle · du @Formats.DateLongue(Model.Annee.DateDebut) au @Formats.DateLongue(Model.Annee.DateFin)</text>
+            }
+        </p>
+    </div>
+    @if (Model.Annee != null)
+    {
+        <div class="periode">
+            <form method="get" class="filtres" style="margin: 0">
+                <label class="sr" for="annee">Année académique</label>
+                <select id="annee" name="annee" asp-items="@(new SelectList(Model.Annees, nameof(AnneeAcad.Id), nameof(AnneeAcad.Libelle), Model.Annee.Id))"></select>
+                <noscript><button class="btn" type="submit">Afficher</button></noscript>
+            </form>
+            <div class="avancement">
+                <div class="avancement__piste"><span style="width: @Pourcent(Model.Avancement)"></span></div>
+                <span class="etiquette">
+                    @(Model.Avancement <= 0 ? "Année à venir" : Model.Avancement >= 1 ? "Année terminée" : $"{Math.Round(Model.Avancement * 100)} % de l'année écoulés")
+                </span>
+            </div>
+        </div>
+    }
+</header>
+
+<section class="chiffres" aria-label="Chiffres clés">
+    <div class="chiffre">
+        <span class="etiquette">Inscriptions</span>
+        <span class="chiffre__valeur">@Formats.Nombre(Model.Inscriptions)</span>
+        <span class="chiffre__note">sur l'année affichée</span>
+    </div>
+    <div class="chiffre">
+        <span class="etiquette">Encaissé</span>
+        <span class="chiffre__valeur">@Formats.Nombre(Model.Encaisse)<small>@Formats.Devise</small></span>
+        <span class="chiffre__note">reste @Formats.Montant(Model.ResteAEncaisser) à encaisser</span>
+    </div>
+    <div class="chiffre">
+        <span class="etiquette">Étudiants</span>
+        <span class="chiffre__valeur">@Formats.Nombre(Model.Etudiants)</span>
+        <span class="chiffre__note">dossiers au registre</span>
+    </div>
+    <div class="chiffre">
+        <span class="etiquette">Enseignants</span>
+        <span class="chiffre__valeur">@Formats.Nombre(Model.Enseignants)</span>
+        <span class="chiffre__note">corps enseignant</span>
+    </div>
+</section>
+
+<div class="colonnes">
+    <section class="bloc">
+        <div class="bloc__tete">
+            <h2 class="bloc__titre">Inscrits par filière</h2>
+            <a asp-controller="Inscriptions" asp-action="Index" asp-route-anneeId="@anneeId" class="discret">Détails</a>
+        </div>
+        @if (Model.ParFiliere.Count == 0)
+        {
+            <p class="vide">Aucune filière.</p>
+        }
+        else
+        {
+            <ul class="barres">
+                @foreach (var f in Model.ParFiliere)
+                {
+                    <li class="barre" title="@f.Libelle">
+                        <span class="barre__code">@f.Code</span>
+                        <span class="barre__piste"><span style="width: @Pourcent(f.Nombre / (double)maxFiliere)"></span></span>
+                        <span class="barre__valeur">@f.Nombre</span>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+
+    <section class="bloc">
+        <div class="bloc__tete">
+            <h2 class="bloc__titre">État des dossiers</h2>
+            <span class="etiquette">@Formats.Pluriel(totalStatuts, "inscription")</span>
+        </div>
+        <div class="segments" role="img" aria-label="Répartition des inscriptions par statut">
+            @foreach (var s in Model.ParStatut.Where(s => s.Nombre > 0))
+            {
+                <span data-statut="@s.Code" style="flex: @s.Nombre"></span>
+            }
+        </div>
+        <ul class="legende">
+            @foreach (var s in Model.ParStatut)
+            {
+                <li>
+                    <a class="statut" data-statut="@s.Code" asp-controller="Inscriptions" asp-action="Index" asp-route-anneeId="@anneeId" asp-route-statut="@s.Code">@s.Libelle</a>
+                    <span class="num">@s.Nombre</span>
+                </li>
+            }
+        </ul>
+    </section>
+</div>
+
+<section class="bloc">
+    <div class="bloc__tete">
+        <h2 class="bloc__titre">À traiter</h2>
+    </div>
+    <ul class="taches">
+        <li class="tache @(Model.InscriptionsEnAttente == 0 ? "tache--nulle" : null)">
+            <span class="tache__nombre">@Model.InscriptionsEnAttente</span>
+            <span>inscription(s) en attente de validation cette année</span>
+            <a asp-controller="Inscriptions" asp-action="Index" asp-route-anneeId="@anneeId" asp-route-statut="@Inscription.EnAttente">Ouvrir</a>
+        </li>
+        <li class="tache @(Model.InscriptionsSansPaiement == 0 ? "tache--nulle" : null)">
+            <span class="tache__nombre">@Model.InscriptionsSansPaiement</span>
+            <span>inscription(s) validée(s) sans aucun paiement</span>
+            <a asp-controller="Inscriptions" asp-action="Index" asp-route-anneeId="@anneeId" asp-route-statut="@Inscription.Validee">Ouvrir</a>
+        </li>
+        <li class="tache @(Model.Impayes == 0 ? "tache--nulle" : null)">
+            <span class="tache__nombre">@Model.Impayes</span>
+            <span>inscription(s) avec un solde impayé</span>
+            <a asp-controller="Paiements" asp-action="Impayes" asp-route-anneeId="@anneeId">Ouvrir</a>
+        </li>
+        <li class="tache @(Model.CoursNonAttribues == 0 ? "tache--nulle" : null)">
+            <span class="tache__nombre">@Model.CoursNonAttribues</span>
+            <span>cours sans enseignant attribué</span>
+            <a asp-controller="Cours" asp-action="Index" asp-route-enseignantId="@UniversiteMvc2.Controllers.CoursController.NonAttribue">Ouvrir</a>
+        </li>
+    </ul>
+</section>
+
+<div class="colonnes">
+    <section class="bloc">
+        <div class="bloc__tete">
+            <h2 class="bloc__titre">Dernières inscriptions</h2>
+            <a asp-controller="Inscriptions" asp-action="Create" class="discret">Nouvelle</a>
+        </div>
+        @if (Model.DernieresInscriptions.Count == 0)
+        {
+            <p class="vide">Aucune inscription pour l'instant.</p>
+        }
+        else
+        {
+            <table class="registre">
+                <tbody>
+                    @foreach (var i in Model.DernieresInscriptions)
+                    {
+                        <tr>
+                            <td><a class="lien-fort" asp-controller="Inscriptions" asp-action="Details" asp-route-id="@i.Id">@i.Etudiant?.NomComplet</a></td>
+                            <td class="mono">@i.Filiere?.Code @i.Niveau?.Code</td>
+                            <td><span class="statut" data-statut="@i.Statut">@i.Statut</span></td>
+                            <td class="num discret">@Formats.Date(i.DateInscription)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+    <section class="bloc">
+        <div class="bloc__tete">
+            <h2 class="bloc__titre">Derniers paiements</h2>
+            <a asp-controller="Paiements" asp-action="Create" class="discret">Enregistrer</a>
+        </div>
+        @if (Model.DerniersPaiements.Count == 0)
+        {
+            <p class="vide">Aucun paiement enregistré.</p>
+        }
+        else
+        {
+            <table class="registre">
+                <tbody>
+                    @foreach (var p in Model.DerniersPaiements)
+                    {
+                        <tr>
+                            <td><a class="lien-fort" asp-controller="Paiements" asp-action="Details" asp-route-id="@p.Id">@p.Inscription?.Etudiant?.NomComplet</a></td>
+                            <td class="discret">@p.Mode</td>
+                            <td class="num">@Formats.Montant(p.Montant)</td>
+                            <td class="num discret">@Formats.Date(p.DatePaiement)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+</div>

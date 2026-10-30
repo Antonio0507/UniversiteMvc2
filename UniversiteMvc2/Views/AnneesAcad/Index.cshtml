@@ -1,0 +1,51 @@
+@model List<AnneeAcad>
+@{
+    ViewData["Title"] = "Années académiques";
+    var aujourdhui = DateTime.Today;
+}
+
+<header class="entete">
+    <div>
+        <h1>Années académiques</h1>
+        <p class="entete__resume">Le calendrier qui structure inscriptions et paiements.</p>
+    </div>
+    <div class="entete__actions">
+        <a asp-action="Create" class="btn btn--plein">Ouvrir une année</a>
+    </div>
+</header>
+
+@if (Model.Count == 0)
+{
+    <p class="vide">Aucune année définie. <a asp-action="Create">Ouvrir la première</a></p>
+}
+else
+{
+    <div class="defilement">
+        <table class="registre">
+            <thead>
+                <tr>
+                    <th>Année</th>
+                    <th>Période</th>
+                    <th>État</th>
+                    <th class="num">Inscriptions</th>
+                    <th class="num">Encaissé</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var a in Model)
+                {
+                    var etat = aujourdhui < a.DateDebut ? "À venir" : aujourdhui > a.DateFin ? "Close" : "En cours";
+                    <tr>
+                        <td><a asp-action="Details" asp-route-id="@a.Id" class="lien-fort mono">@a.Libelle</a></td>
+                        <td class="discret">@Formats.Date(a.DateDebut) → @Formats.Date(a.DateFin)</td>
+                        <td>@(etat == "En cours" ? Html.Raw("<strong>En cours</strong>") : etat)</td>
+                        <td class="num">@a.Inscriptions.Count</td>
+                        <td class="num">@Formats.Montant(a.Inscriptions.SelectMany(i => i.Paiements).Sum(p => p.Montant))</td>
+                        <td class="actions"><a asp-action="Edit" asp-route-id="@a.Id">Modifier</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

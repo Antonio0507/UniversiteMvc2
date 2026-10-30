@@ -1,0 +1,40 @@
+@using System.Security.Claims
+@{
+    ViewData["Title"] = "Mot de passe";
+    var obligatoire = User.HasClaim(c => c.Type == Droits.ClaimDoitChanger);
+    string? Erreur(string champ) => ViewData.ModelState[champ]?.Errors.FirstOrDefault()?.ErrorMessage;
+}
+
+<div class="connexion">
+    <header class="entete">
+        <div>
+            <h1>Mot de passe</h1>
+            <p class="entete__resume">
+                @(obligatoire ? "Ce mot de passe est provisoire : choisissez le vôtre pour continuer." : "Choisissez un nouveau mot de passe.")
+            </p>
+        </div>
+    </header>
+
+    <form asp-action="MotDePasse" method="post" class="formulaire">
+        <div class="champ">
+            <label class="champ__libelle" for="actuel">Mot de passe actuel</label>
+            <input class="champ__controle" id="actuel" name="actuel" type="password" autocomplete="current-password" required />
+            <span class="champ__erreur">@Erreur("actuel")</span>
+        </div>
+        <div class="champ">
+            <label class="champ__libelle" for="nouveau">Nouveau mot de passe</label>
+            <input class="champ__controle" id="nouveau" name="nouveau" type="password" autocomplete="new-password" minlength="@MotsDePasse.LongueurMinimale" required />
+            <span class="champ__aide">Au moins @MotsDePasse.LongueurMinimale caractères, dont une lettre et un chiffre.</span>
+            <span class="champ__erreur">@Erreur("nouveau")</span>
+        </div>
+        <div class="champ">
+            <label class="champ__libelle" for="confirmation">Confirmation</label>
+            <input class="champ__controle" id="confirmation" name="confirmation" type="password" autocomplete="new-password" required />
+            <span class="champ__erreur">@Erreur("confirmation")</span>
+        </div>
+
+        <div class="formulaire__actions">
+            <button type="submit" class="btn btn--plein">Enregistrer</button>
+        </div>
+    </form>
+</div>

@@ -1,0 +1,47 @@
+@model List<Compte>
+@{
+    ViewData["Title"] = "Comptes";
+}
+
+<header class="entete">
+    <div>
+        <h1>Comptes</h1>
+        <p class="entete__resume">@Formats.Pluriel(Model.Count, "compte") · Scolarité et Comptabilité écrivent dans leurs modules, Consultation lit seulement.</p>
+    </div>
+    <div class="entete__actions">
+        <a asp-action="Create" class="btn btn--plein">Nouveau compte</a>
+    </div>
+</header>
+
+<div class="defilement">
+    <table class="registre">
+        <thead>
+            <tr>
+                <th>Nom</th>
+                <th>E-mail</th>
+                <th>Profil</th>
+                <th>État</th>
+                <th>Dernière connexion</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in Model)
+            {
+                var verrouille = c.VerrouilleJusquA > DateTime.UtcNow;
+                <tr>
+                    <td><a asp-action="Edit" asp-route-id="@c.Id" class="lien-fort">@c.Nom</a></td>
+                    <td class="discret">@c.Email</td>
+                    <td>@c.Role</td>
+                    <td>@(!c.Actif ? "Désactivé" : verrouille ? "Verrouillé" : c.DoitChangerMotDePasse ? "Mot de passe provisoire" : "Actif")</td>
+                    <td class="discret">@(c.DerniereConnexion == null ? "—" : Formats.Date(c.DerniereConnexion.Value))</td>
+                    <td class="actions">
+                        <form asp-action="Reinitialiser" asp-route-id="@c.Id" method="post">
+                            <button type="submit" class="btn btn--lien">Réinitialiser le mot de passe</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

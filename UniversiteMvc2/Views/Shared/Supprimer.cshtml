@@ -1,0 +1,43 @@
+@model Suppression
+@{
+    ViewData["Title"] = Model.Titre;
+}
+
+<div class="confirmation">
+    <header class="entete">
+        <h1>@Model.Titre</h1>
+    </header>
+
+    <p class="confirmation__objet">@Model.Libelle</p>
+
+    @if (!Model.Possible)
+    {
+        <p class="etiquette">Suppression impossible</p>
+        <ul class="points points--blocage">
+            @foreach (var blocage in Model.Blocages)
+            {
+                <li>@blocage</li>
+            }
+        </ul>
+        <p class="discret" style="margin-bottom: var(--e-5)">Retirez d'abord ces éléments, puis recommencez.</p>
+    }
+    else
+    {
+        @if (Model.Effets.Count > 0)
+        {
+            <p class="etiquette">Conséquences</p>
+            <ul class="points">
+                @foreach (var effet in Model.Effets)
+                {
+                    <li>@effet</li>
+                }
+            </ul>
+        }
+        <p style="margin-bottom: var(--e-5)">Cette opération est définitive.</p>
+    }
+
+    <form asp-action="Delete" asp-route-id="@Model.Id" class="formulaire__actions">
+        <button type="submit" class="btn btn--danger" disabled="@(!Model.Possible)">Supprimer définitivement</button>
+        <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn--lien">Annuler</a>
+    </form>
+</div>
