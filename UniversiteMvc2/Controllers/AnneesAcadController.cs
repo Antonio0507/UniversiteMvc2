@@ -6,10 +6,18 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
+/// <summary>
+/// Gestion des années académiques : calendrier qui encadre inscriptions, tarifs, séances et délibérations.
+/// </summary>
 public class AnneesAcadController : AppController
 {
+    /// <summary>Crée le contrôleur.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     public AnneesAcadController(ApplicationDbContext context) : base(context) { }
 
+    /// <summary>
+    /// Liste des années, de la plus récente à la plus ancienne, avec leurs inscriptions et encaissements.
+    /// </summary>
     public async Task<IActionResult> Index()
     {
         var liste = await _context.AnneesAcad.AsNoTracking()
@@ -19,6 +27,9 @@ public class AnneesAcadController : AppController
         return View(liste);
     }
 
+    /// <summary>Affiche la fiche d'une année académique, avec ses inscriptions par filière et niveau.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
+    /// <returns>La fiche, ou 404 si l'élément n'existe pas.</returns>
     public async Task<IActionResult> Details(int? id)
     {
         if (id == null) return NotFound();
@@ -34,6 +45,10 @@ public class AnneesAcadController : AppController
         return View(annee);
     }
 
+    /// <summary>
+    /// Affiche le formulaire de création, pré-rempli avec l'année qui suit la plus récente (par défaut du 1er octobre
+    /// au 31 juillet).
+    /// </summary>
     public async Task<IActionResult> Create()
     {
         // Propose l'année qui suit la plus récente
@@ -47,6 +62,11 @@ public class AnneesAcadController : AppController
         });
     }
 
+    /// <summary>
+    /// Enregistre l'année (la date de fin doit suivre la date de début), puis ouvre sa
+    /// fiche ; en cas d'erreur, réaffiche le formulaire.
+    /// </summary>
+    /// <param name="annee">Valeurs saisies (seuls les champs du formulaire sont liés).</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create([Bind("Libelle,DateDebut,DateFin")] AnneeAcad annee)
@@ -64,6 +84,8 @@ public class AnneesAcadController : AppController
         return View("Formulaire", annee);
     }
 
+    /// <summary>Affiche le formulaire de modification d'une année académique.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Edit(int? id)
     {
         if (id == null) return NotFound();
@@ -74,6 +96,11 @@ public class AnneesAcadController : AppController
         return View("Formulaire", annee);
     }
 
+    /// <summary>
+    /// Enregistre les modifications d'une année académique, puis revient sur sa fiche ; en cas d'erreur, réaffiche le
+    /// formulaire.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id)
@@ -93,6 +120,11 @@ public class AnneesAcadController : AppController
         return View("Formulaire", annee);
     }
 
+    /// <summary>
+    /// Affiche la confirmation de suppression d'une année académique, avec ce qui l'empêche : les inscriptions qui y
+    /// sont rattachées.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Delete(int? id)
     {
         if (id == null) return NotFound();
@@ -105,6 +137,8 @@ public class AnneesAcadController : AppController
             blocages: Si((inscriptions, $"{Formats.Pluriel(inscriptions, "inscription")} y {(inscriptions > 1 ? "sont rattachées" : "est rattachée")}.")));
     }
 
+    /// <summary>Supprime l'année académique après confirmation, puis revient à la liste.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(int id)

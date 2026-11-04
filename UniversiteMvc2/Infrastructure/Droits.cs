@@ -8,10 +8,17 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Infrastructure;
 
-// Règles d'accès, déduites du sommaire (Navigation) : une seule source pour le contrôle serveur et l'affichage des liens
+/// <summary>
+/// Règles d'accès, déduites du sommaire (Navigation) : une seule source pour le contrôle serveur et l'affichage des
+/// liens
+/// </summary>
 public static class Droits
 {
+    /// <summary>Claim posé tant que le compte doit changer son mot de passe provisoire.</summary>
     public const string ClaimDoitChanger = "doit_changer_mot_de_passe";
+    /// <summary>
+    /// Claim qui porte le jeton de session du compte ; s'il ne correspond plus à la base, la session est rejetée.
+    /// </summary>
     public const string ClaimJeton = "jeton";
 
     // Actions GET qui ouvrent une écriture, ou sortent des données en masse
@@ -20,12 +27,23 @@ public static class Droits
         "Create", "Edit", "Delete", "Exporter", "ExporterImpayes"
     };
 
+    /// <summary>
+    /// Indique si l'utilisateur peut consulter une section : toutes, sauf les sections réservées hors administrateur.
+    /// </summary>
+    /// <param name="utilisateur">Utilisateur connecté.</param>
+    /// <param name="controleur">Nom du contrôleur.</param>
     public static bool PeutLire(ClaimsPrincipal utilisateur, string? controleur)
     {
         var section = Navigation.Par(controleur);
         return section == null || !section.Reserve || utilisateur.IsInRole(Roles.Administrateur);
     }
 
+    /// <summary>
+    /// Indique si l'utilisateur peut modifier une section : l'administrateur partout, les autres profils dans leurs
+    /// sections.
+    /// </summary>
+    /// <param name="utilisateur">Utilisateur connecté.</param>
+    /// <param name="controleur">Nom du contrôleur.</param>
     public static bool PeutEcrire(ClaimsPrincipal utilisateur, string? controleur)
     {
         var section = Navigation.Par(controleur);
@@ -35,6 +53,14 @@ public static class Droits
         return section.Ecriture == null || section.Ecriture.Any(utilisateur.IsInRole);
     }
 
+    /// <summary>
+    /// Indique si une action est autorisée. Toute requête non GET, et les actions Create, Edit, Delete, Exporter et
+    /// ExporterImpayes, exigent le droit d'écriture.
+    /// </summary>
+    /// <param name="utilisateur">Utilisateur connecté.</param>
+    /// <param name="controleur">Nom du contrôleur.</param>
+    /// <param name="action">Nom de l'action.</param>
+    /// <param name="requeteLecture">true pour une requête GET ou HEAD.</param>
     public static bool Autorise(ClaimsPrincipal utilisateur, string? controleur, string? action, bool requeteLecture)
     {
         var ecriture = !requeteLecture || (action != null && ActionsEcriture.Contains(action));
@@ -42,9 +68,17 @@ public static class Droits
     }
 }
 
-// Appliqué à toutes les actions (Program.cs) ; l'authentification est déjà exigée par la politique par défaut
+/// <summary>
+/// Appliqué à toutes les actions (Program.cs) ; l'authentification est déjà exigée par la politique par défaut
+/// </summary>
+/// <param name="journal">Logs techniques, pour tracer les accès refusés.</param>
 public class DroitsFilter(ILogger<DroitsFilter> journal) : IAuthorizationFilter
 {
+    /// <summary>
+    /// Redirige vers le changement de mot de passe s'il est provisoire, et renvoie 403 si l'action n'est pas
+    /// autorisée.
+    /// </summary>
+    /// <param name="context">Contexte d'autorisation de la requête.</param>
     public void OnAuthorization(AuthorizationFilterContext context)
     {
         var utilisateur = context.HttpContext.User;
@@ -70,17 +104,23 @@ public class DroitsFilter(ILogger<DroitsFilter> journal) : IAuthorizationFilter
     }
 }
 
-// Masque les liens et formulaires vers des actions que l'utilisateur n'a pas le droit d'exécuter
+/// <summary>Masque les liens et formulaires vers des actions que l'utilisateur n'a pas le droit d'exécuter</summary>
 [HtmlTargetElement("a", Attributes = "asp-action")]
 [HtmlTargetElement("form", Attributes = "asp-action")]
 public class DroitsTagHelper : TagHelper
 {
+    /// <summary>Contexte de la vue, fourni par Razor.</summary>
     [Microsoft.AspNetCore.Mvc.ViewFeatures.ViewContext, HtmlAttributeNotBound]
     public Microsoft.AspNetCore.Mvc.Rendering.ViewContext ViewContext { get; set; } = default!;
 
-    // Après les tag helpers standards
+    /// <summary>Après les tag helpers standards</summary>
     public override int Order => 1000;
 
+    /// <summary>
+    /// Supprime la balise si l'action visée n'est pas autorisée ; un formulaire en GET reste une lecture.
+    /// </summary>
+    /// <param name="context">Contexte du tag helper.</param>
+    /// <param name="output">Balise produite.</param>
     public override void Process(TagHelperContext context, TagHelperOutput output)
     {
         var action = context.AllAttributes["asp-action"]?.Value?.ToString();
@@ -96,13 +136,16 @@ public class DroitsTagHelper : TagHelper
     }
 }
 
+/// <summary>Politique, génération et réinitialisation des mots de passe des comptes.</summary>
 public static class MotsDePasse
 {
+    /// <summary>Longueur minimale d'un mot de passe.</summary>
     public const int LongueurMinimale = 10;
 
     private const string Alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-    // Null si le mot de passe convient, sinon le message à afficher
+    /// <summary>Null si le mot de passe convient, sinon le message à afficher</summary>
+    /// <param name="motDePasse">Mot de passe proposé.</param>
     public static string? Verifier(string? motDePasse)
     {
         if (string.IsNullOrEmpty(motDePasse) || motDePasse.Length < LongueurMinimale)
@@ -112,7 +155,11 @@ public static class MotsDePasse
         return null;
     }
 
-    // Pose un mot de passe provisoire, débloque le compte et ferme ses sessions ; renvoie le provisoire, à transmettre une seule fois
+    /// <summary>
+    /// Pose un mot de passe provisoire, débloque le compte et ferme ses sessions ; renvoie le provisoire, à
+    /// transmettre une seule fois
+    /// </summary>
+    /// <param name="compte">Compte à réinitialiser (modifié en mémoire, à enregistrer).</param>
     public static string Reinitialiser(Compte compte)
     {
         var provisoire = Generer();
@@ -124,7 +171,9 @@ public static class MotsDePasse
         return provisoire;
     }
 
-    // Mot de passe provisoire, sans caractères ambigus (l, 1, O, 0) car il est souvent recopié ou dicté
+    /// <summary>
+    /// Mot de passe provisoire, sans caractères ambigus (l, 1, O, 0) car il est souvent recopié ou dicté
+    /// </summary>
     public static string Generer()
     {
         while (true)

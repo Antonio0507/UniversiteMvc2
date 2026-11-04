@@ -7,8 +7,11 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
+/// <summary>Gestion des paiements : versements, reçus et suivi des impayés.</summary>
 public class PaiementsController : AppController
 {
+    /// <summary>Crée le contrôleur.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     public PaiementsController(ApplicationDbContext context) : base(context) { }
 
     private IQueryable<Paiement> Filtrer(string? q, string? mode, int? anneeId)
@@ -31,6 +34,11 @@ public class PaiementsController : AppController
         return requete;
     }
 
+    /// <summary>Liste paginée des paiements, le plus récent d'abord.</summary>
+    /// <param name="q">Recherche sur le nom, le prénom ou le matricule de l'étudiant.</param>
+    /// <param name="mode">Filtre par mode de paiement.</param>
+    /// <param name="anneeId">Filtre par année.</param>
+    /// <param name="page">Numéro de page.</param>
     public async Task<IActionResult> Index(string? q, string? mode, int? anneeId, int page = 1)
     {
         var requete = Filtrer(q, mode, anneeId);
@@ -44,6 +52,10 @@ public class PaiementsController : AppController
         return View(await ListePaginee<Paiement>.CreerAsync(tri, page));
     }
 
+    /// <summary>Exporte les paiements en CSV, avec les mêmes filtres que la liste.</summary>
+    /// <param name="q">Recherche sur l'étudiant.</param>
+    /// <param name="mode">Filtre par mode.</param>
+    /// <param name="anneeId">Filtre par année.</param>
     public async Task<IActionResult> Exporter(string? q, string? mode, int? anneeId)
     {
         var paiements = await Filtrer(q, mode, anneeId).OrderByDescending(p => p.DatePaiement).ThenByDescending(p => p.Id).ToListAsync();
@@ -57,7 +69,8 @@ public class PaiementsController : AppController
         return File(contenu, "text/csv", "paiements.csv");
     }
 
-    // Soldes restant dus sur les inscriptions validées d'une année
+    /// <summary>Soldes restant dus sur les inscriptions validées d'une année</summary>
+    /// <param name="anneeId">Année ; par défaut l'année en cours.</param>
     public async Task<IActionResult> Impayes(int? anneeId)
     {
         var annee = await AnneeOuCouranteAsync(anneeId);
@@ -66,6 +79,8 @@ public class PaiementsController : AppController
         return View(annee == null ? new List<LigneImpaye>() : await _context.ImpayesAsync(annee.Id));
     }
 
+    /// <summary>Exporte les impayés de l'année en CSV.</summary>
+    /// <param name="anneeId">Année ; par défaut l'année en cours.</param>
     public async Task<IActionResult> ExporterImpayes(int? anneeId)
     {
         var annee = await AnneeOuCouranteAsync(anneeId);
@@ -80,7 +95,8 @@ public class PaiementsController : AppController
         return File(contenu, "text/csv", $"impayes-{annee?.Libelle}.csv");
     }
 
-    // La fiche d'un paiement est aussi son reçu imprimable
+    /// <summary>La fiche d'un paiement est aussi son reçu imprimable</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Details(int? id)
     {
         if (id == null) return NotFound();
@@ -99,6 +115,8 @@ public class PaiementsController : AppController
         return View(paiement);
     }
 
+    /// <summary>Affiche le formulaire d'un nouveau versement.</summary>
+    /// <param name="inscriptionId">Inscription pré-sélectionnée, facultative.</param>
     public async Task<IActionResult> Create(int? inscriptionId)
     {
         var paiement = new Paiement { InscriptionId = inscriptionId ?? 0 };
@@ -106,6 +124,11 @@ public class PaiementsController : AppController
         return View("Formulaire", paiement);
     }
 
+    /// <summary>
+    /// Enregistre le paiement (refusé sur une inscription annulée ou au-delà du reste à
+    /// payer), puis ouvre sa fiche ; en cas d'erreur, réaffiche le formulaire.
+    /// </summary>
+    /// <param name="paiement">Valeurs saisies (seuls les champs du formulaire sont liés).</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create([Bind("Montant,DatePaiement,Mode,InscriptionId")] Paiement paiement)
@@ -125,6 +148,8 @@ public class PaiementsController : AppController
         return View("Formulaire", paiement);
     }
 
+    /// <summary>Affiche le formulaire de modification d'un paiement.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Edit(int? id)
     {
         if (id == null) return NotFound();
@@ -136,6 +161,11 @@ public class PaiementsController : AppController
         return View("Formulaire", paiement);
     }
 
+    /// <summary>
+    /// Enregistre les modifications d'un paiement, puis revient sur sa fiche ; en cas d'erreur, réaffiche le
+    /// formulaire.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id)
@@ -159,6 +189,8 @@ public class PaiementsController : AppController
         return View("Formulaire", paiement);
     }
 
+    /// <summary>Affiche la confirmation de suppression d'un paiement.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Delete(int? id)
     {
         if (id == null) return NotFound();
@@ -172,6 +204,8 @@ public class PaiementsController : AppController
             $"{Formats.Montant(paiement.Montant)} du {Formats.Date(paiement.DatePaiement)} — {paiement.Inscription?.Etudiant?.NomComplet}", paiement.Id);
     }
 
+    /// <summary>Supprime le paiement après confirmation, puis revient à la liste.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(int id)

@@ -8,11 +8,15 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
+/// <summary>Tableau de bord et pages d'erreur.</summary>
 public class HomeController : AppController
 {
+    /// <summary>Crée le contrôleur.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     public HomeController(ApplicationDbContext context) : base(context) { }
 
-    // Tableau de bord : par défaut l'année académique en cours
+    /// <summary>Tableau de bord : par défaut l'année académique en cours</summary>
+    /// <param name="annee">Année affichée ; par défaut l'année en cours, sinon la plus récente.</param>
     public async Task<IActionResult> Index(int? annee)
     {
         var annees = await _context.AnneesAcad.AsNoTracking().OrderByDescending(a => a.DateDebut).ToListAsync();
@@ -62,12 +66,18 @@ public class HomeController : AppController
         return View(modele);
     }
 
-    // Page affichée pour les codes d'erreur HTTP (404, 403, 429…).
-    // Après un POST refusé, elle est rejouée en POST : le jeton anti-CSRF ne doit pas y être revérifié, sinon elle reste vide.
+    /// <summary>
+    /// Page affichée pour les codes d'erreur HTTP (404, 403, 429…). Après un POST refusé, elle est rejouée en POST :
+    /// le jeton anti-CSRF ne doit pas y être revérifié, sinon elle reste vide.
+    /// </summary>
+    /// <param name="code">Code HTTP de l'erreur.</param>
     [AllowAnonymous]
     [IgnoreAntiforgeryToken]
     public IActionResult Introuvable([FromQuery] int code = 404) => View(code);
 
+    /// <summary>
+    /// Page générique affichée après une panne imprévue, avec la référence de la requête à retrouver dans les logs.
+    /// </summary>
     [AllowAnonymous]
     [IgnoreAntiforgeryToken]
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]

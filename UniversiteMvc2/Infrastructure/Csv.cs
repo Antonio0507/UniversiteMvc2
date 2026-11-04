@@ -2,9 +2,16 @@ using System.Text;
 
 namespace UniversiteMvc2.Infrastructure;
 
-// Export tableur : point-virgule et BOM UTF-8, pour une ouverture correcte dans Excel en français
+/// <summary>Export tableur : point-virgule et BOM UTF-8, pour une ouverture correcte dans Excel en français</summary>
 public static class Csv
 {
+    /// <summary>
+    /// Produit un fichier CSV : une cellule commençant par =, +, - ou @ est neutralisée pour ne pas être exécutée
+    /// comme une formule.
+    /// </summary>
+    /// <param name="entetes">Titres des colonnes.</param>
+    /// <param name="lignes">Valeurs, une collection par ligne (dates et nombres formatés en français).</param>
+    /// <returns>Contenu du fichier, BOM compris.</returns>
     public static byte[] Generer(IEnumerable<string> entetes, IEnumerable<IEnumerable<object?>> lignes)
     {
         var texte = new StringBuilder();

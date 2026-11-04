@@ -6,35 +6,62 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Data;
 
+/// <summary>
+/// Accès à la base MySQL/MariaDB par Entity Framework Core : tables, index, relations et règles de suppression.
+/// Chaque écriture est tracée dans le journal d'audit.
+/// </summary>
 public class ApplicationDbContext : DbContext
 {
     private readonly IHttpContextAccessor? _http;
 
+    /// <summary>Crée le contexte.</summary>
+    /// <param name="options">Connexion et fournisseur MySQL, configurés dans Program.cs.</param>
+    /// <param name="http">Requête en cours, pour connaître l'auteur d'une écriture ; absent hors requête (démarrage, ligne de commande).</param>
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IHttpContextAccessor? http = null)
         : base(options)
     {
         _http = http;
     }
 
+    /// <summary>Étudiants et enseignants, stockés dans une seule table (héritage TPH, colonne Role).</summary>
     public DbSet<Utilisateur> Utilisateurs { get; set; }
+    /// <summary>Table des étudiants (partie de Utilisateurs).</summary>
     public DbSet<Etudiant> Etudiants { get; set; }
+    /// <summary>Table des enseignants (partie de Utilisateurs).</summary>
     public DbSet<Enseignant> Enseignants { get; set; }
+    /// <summary>Table des filières.</summary>
     public DbSet<Filiere> Filieres { get; set; }
+    /// <summary>Table des niveaux.</summary>
     public DbSet<Niveau> Niveaux { get; set; }
+    /// <summary>Table des années académiques.</summary>
     public DbSet<AnneeAcad> AnneesAcad { get; set; }
+    /// <summary>Table des unités d'enseignement.</summary>
     public DbSet<UE> UEs { get; set; }
+    /// <summary>Table des cours.</summary>
     public DbSet<Cours> Cours { get; set; }
+    /// <summary>Table des inscriptions.</summary>
     public DbSet<Inscription> Inscriptions { get; set; }
+    /// <summary>Table des paiements.</summary>
     public DbSet<Paiement> Paiements { get; set; }
+    /// <summary>Table des tarifs.</summary>
     public DbSet<Tarif> Tarifs { get; set; }
+    /// <summary>Table des notes.</summary>
     public DbSet<Note> Notes { get; set; }
+    /// <summary>Table des salles.</summary>
     public DbSet<Salle> Salles { get; set; }
+    /// <summary>Table des séances de l'emploi du temps.</summary>
     public DbSet<Seance> Seances { get; set; }
+    /// <summary>Table des absences.</summary>
     public DbSet<Absence> Absences { get; set; }
+    /// <summary>Table des bourses, exonérations et réductions.</summary>
     public DbSet<Aide> Aides { get; set; }
+    /// <summary>Table des comptes du personnel.</summary>
     public DbSet<Compte> Comptes { get; set; }
+    /// <summary>Journal d'audit : une ligne par écriture ou événement de sécurité.</summary>
     public DbSet<JournalAudit> JournalAudit { get; set; }
 
+    /// <summary>Déclare l'héritage, les index uniques, les relations et leur comportement à la suppression.</summary>
+    /// <param name="modelBuilder">Constructeur du modèle EF Core.</param>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -150,7 +177,13 @@ public class ApplicationDbContext : DbContext
     // Ni le contenu ni l'empreinte du mot de passe n'entrent dans le journal
     private const string MotDePasse = "MotDePasseHash";
 
-    // Toute écriture est tracée dans la même transaction : pas de modification sans trace, ni de trace sans modification
+    /// <summary>
+    /// Toute écriture est tracée dans la même transaction : pas de modification sans trace, ni de trace sans
+    /// modification
+    /// </summary>
+    /// <param name="acceptAllChangesOnSuccess">Paramètre standard d'EF Core.</param>
+    /// <param name="cancellationToken">Annulation de l'opération.</param>
+    /// <returns>Nombre de lignes écrites, hors journal d'audit.</returns>
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         ChangeTracker.DetectChanges();

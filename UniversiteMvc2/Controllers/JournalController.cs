@@ -6,11 +6,18 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
-// Consultation du journal d'audit (administrateurs uniquement, voir Navigation) ; il n'est jamais modifiable
+/// <summary>
+/// Consultation du journal d'audit (administrateurs uniquement, voir Navigation) ; il n'est jamais modifiable
+/// </summary>
 public class JournalController : AppController
 {
+    /// <summary>Crée le contrôleur.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     public JournalController(ApplicationDbContext context) : base(context) { }
 
+    /// <summary>Liste du journal, la plus récente d'abord, 50 lignes par page.</summary>
+    /// <param name="q">Recherche sur l'auteur, l'action, l'entité ou le détail.</param>
+    /// <param name="page">Numéro de page.</param>
     public async Task<IActionResult> Index(string? q, int page = 1)
     {
         var requete = _context.JournalAudit.AsNoTracking();

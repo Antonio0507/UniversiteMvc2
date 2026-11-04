@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>d89068e2-5e91-4e31-b257-5ee140297d17</UserSecretsId>
+    <!-- Commentaires /// exportés dans UniversiteMvc2.xml, et vérifiés à la compilation (XML bien formé, paramètres existants) -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>

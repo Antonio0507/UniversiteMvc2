@@ -184,10 +184,19 @@ app.MapControllerRoute(
 
 app.Run();
 
+/// <summary>
+/// Point d'entrée de l'application, rendu public pour les tests d'intégration (WebApplicationFactory).
+/// </summary>
 public partial class Program;
 
+/// <summary>Contrôle de santé de /sante : la base de données répond-elle ?</summary>
+/// <param name="db">Contexte de base de données.</param>
 public class BaseDeDonneesCheck(ApplicationDbContext db) : IHealthCheck
 {
+    /// <summary>Tente une connexion à la base.</summary>
+    /// <param name="context">Contexte du contrôle.</param>
+    /// <param name="cancellationToken">Annulation.</param>
+    /// <returns>Healthy si la base répond, Unhealthy sinon.</returns>
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default) =>
         await db.Database.CanConnectAsync(cancellationToken) ? HealthCheckResult.Healthy() : HealthCheckResult.Unhealthy();
 }

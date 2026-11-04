@@ -4,12 +4,26 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Infrastructure;
 
-// Rang : place dans la promotion (filière + niveau), à la moyenne ; null sans moyenne
+/// <summary>Une ligne de délibération : une inscription, son bilan et son rang.</summary>
+/// <param name="Inscription">Inscription délibérée.</param>
+/// <param name="Bilan">Moyenne, crédits et décision.</param>
+/// <param name="Rang">Place dans la promotion (filière + niveau), à la moyenne ; null sans moyenne.</param>
 public sealed record LigneDeliberation(Inscription Inscription, Bilan Bilan, int? Rang);
 
-// Résultats de fin d'année : bilan et décision de chaque inscription validée (page Délibérations et procès-verbal PDF)
+/// <summary>
+/// Résultats de fin d'année : bilan et décision de chaque inscription validée (page Délibérations et procès-verbal
+/// PDF)
+/// </summary>
 public static class Deliberations
 {
+    /// <summary>
+    /// Calcule le bilan de chaque inscription validée de l'année, à partir des notes et des UE de son cursus.
+    /// </summary>
+    /// <param name="context">Contexte de base de données.</param>
+    /// <param name="anneeId">Année académique.</param>
+    /// <param name="filiereId">Filtre facultatif sur la filière.</param>
+    /// <param name="niveauId">Filtre facultatif sur le niveau.</param>
+    /// <returns>Lignes triées par filière, niveau, rang puis nom.</returns>
     public static async Task<List<LigneDeliberation>> CalculerAsync(this ApplicationDbContext context, int anneeId, int? filiereId, int? niveauId)
     {
         var requete = context.Inscriptions.AsNoTracking()
@@ -36,7 +50,9 @@ public static class Deliberations
             .ToList();
     }
 
-    // Classement à la moyenne ; les ex aequo partagent le même rang (1, 2, 2, 4…)
+    /// <summary>Classement à la moyenne ; les ex aequo partagent le même rang (1, 2, 2, 4…)</summary>
+    /// <param name="promotion">Inscriptions d'une même promotion, avec leur bilan.</param>
+    /// <returns>Les mêmes inscriptions, avec leur rang.</returns>
     public static IEnumerable<LigneDeliberation> Classer(IEnumerable<(Inscription Inscription, Bilan Bilan)> promotion)
     {
         var lignes = promotion.ToList();

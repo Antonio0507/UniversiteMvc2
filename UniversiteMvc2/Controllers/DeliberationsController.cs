@@ -7,11 +7,20 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
-// Résultats de fin d'année par promotion : moyenne, crédits, rang et décision du jury, calculés à partir des notes
+/// <summary>
+/// Résultats de fin d'année par promotion : moyenne, crédits, rang et décision du jury, calculés à partir des notes
+/// </summary>
 public class DeliberationsController : AppController
 {
+    /// <summary>Crée le contrôleur.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     public DeliberationsController(ApplicationDbContext context) : base(context) { }
 
+    /// <summary>Affiche les résultats et la synthèse (taux de réussite, admis, ajournés, incomplets).</summary>
+    /// <param name="anneeId">Année ; par défaut l'année en cours.</param>
+    /// <param name="filiereId">Filtre facultatif sur la filière.</param>
+    /// <param name="niveauId">Filtre facultatif sur le niveau.</param>
+    /// <param name="decision">Filtre facultatif sur la décision ; la synthèse reste calculée sur toute la sélection.</param>
     public async Task<IActionResult> Index(int? anneeId, int? filiereId, int? niveauId, string? decision)
     {
         var annee = await AnneeOuCouranteAsync(anneeId);
@@ -29,6 +38,11 @@ public class DeliberationsController : AppController
         return View(string.IsNullOrEmpty(decision) ? lignes : lignes.Where(l => l.Bilan.Decision == decision).ToList());
     }
 
+    /// <summary>Exporte les résultats en CSV, avec les mêmes filtres que la page.</summary>
+    /// <param name="anneeId">Année académique.</param>
+    /// <param name="filiereId">Filtre facultatif sur la filière.</param>
+    /// <param name="niveauId">Filtre facultatif sur le niveau.</param>
+    /// <param name="decision">Filtre facultatif sur la décision.</param>
     public async Task<IActionResult> Exporter(int anneeId, int? filiereId, int? niveauId, string? decision)
     {
         var lignes = await _context.CalculerAsync(anneeId, filiereId, niveauId);

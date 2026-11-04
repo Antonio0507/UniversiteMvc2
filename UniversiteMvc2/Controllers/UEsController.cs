@@ -7,10 +7,17 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
+/// <summary>Gestion des unités d'enseignement : code, intitulé, crédits, filière et niveau.</summary>
 public class UEsController : AppController
 {
+    /// <summary>Crée le contrôleur.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     public UEsController(ApplicationDbContext context) : base(context) { }
 
+    /// <summary>Liste des UE, filtrable.</summary>
+    /// <param name="q">Recherche sur le code ou l'intitulé.</param>
+    /// <param name="filiereId">Filtre par filière.</param>
+    /// <param name="niveauId">Filtre par niveau.</param>
     public async Task<IActionResult> Index(string? q, int? filiereId, int? niveauId)
     {
         var requete = _context.UEs.AsNoTracking()
@@ -35,6 +42,9 @@ public class UEsController : AppController
         return View(liste);
     }
 
+    /// <summary>Affiche la fiche d'une UE, avec ses cours.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
+    /// <returns>La fiche, ou 404 si l'élément n'existe pas.</returns>
     public async Task<IActionResult> Details(int? id)
     {
         if (id == null) return NotFound();
@@ -49,6 +59,9 @@ public class UEsController : AppController
         return View(ue);
     }
 
+    /// <summary>Affiche le formulaire de création d'une UE.</summary>
+    /// <param name="filiereId">Filière pré-sélectionnée.</param>
+    /// <param name="niveauId">Niveau pré-sélectionné.</param>
     public async Task<IActionResult> Create(int? filiereId, int? niveauId)
     {
         var ue = new UE { Credits = 6, FiliereId = filiereId ?? 0, NiveauId = niveauId ?? 0 };
@@ -56,6 +69,11 @@ public class UEsController : AppController
         return View("Formulaire", ue);
     }
 
+    /// <summary>
+    /// Enregistre l'UE (code mis en majuscules), puis ouvre sa fiche ; en cas d'erreur,
+    /// réaffiche le formulaire.
+    /// </summary>
+    /// <param name="ue">Valeurs saisies (seuls les champs du formulaire sont liés).</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create([Bind("Code,Intitule,Credits,FiliereId,NiveauId")] UE ue)
@@ -74,6 +92,8 @@ public class UEsController : AppController
         return View("Formulaire", ue);
     }
 
+    /// <summary>Affiche le formulaire de modification d'une UE.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Edit(int? id)
     {
         if (id == null) return NotFound();
@@ -85,6 +105,10 @@ public class UEsController : AppController
         return View("Formulaire", ue);
     }
 
+    /// <summary>
+    /// Enregistre les modifications d'une UE, puis revient sur sa fiche ; en cas d'erreur, réaffiche le formulaire.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id)
@@ -105,6 +129,11 @@ public class UEsController : AppController
         return View("Formulaire", ue);
     }
 
+    /// <summary>
+    /// Affiche la confirmation de suppression d'une UE, avec ce qui l'empêche : les séances programmées pour ses
+    /// cours ; ses cours sont supprimés avec elle.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Delete(int? id)
     {
         if (id == null) return NotFound();
@@ -120,6 +149,8 @@ public class UEsController : AppController
             effets: Si((cours, $"{Formats.Pluriel(cours, "cours")} {(cours > 1 ? "seront supprimés" : "sera supprimé")} avec elle.")));
     }
 
+    /// <summary>Supprime l'UE après confirmation, puis revient à la liste.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(int id)

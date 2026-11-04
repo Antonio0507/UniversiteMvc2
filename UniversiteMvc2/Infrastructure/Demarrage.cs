@@ -7,15 +7,26 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Infrastructure;
 
-// Préparation de la base au lancement : schéma, référentiel minimal, premier administrateur, démonstration (facultative)
+/// <summary>
+/// Préparation de la base au lancement : schéma, référentiel minimal, premier administrateur, démonstration
+/// (facultative)
+/// </summary>
 public static class Demarrage
 {
+    /// <summary>
+    /// Argument de ligne de commande qui réinitialise un mot de passe au lieu de démarrer le serveur web.
+    /// </summary>
     public const string CommandeReinitialisation = "reinitialiser-mot-de-passe";
 
     private const string MigrationInitiale = "20261030101445_Initial";
 
-    // Dernier recours en ligne de commande, si plus aucun administrateur ne peut se connecter.
-    // Réservé à qui a accès au serveur ; tracé dans le journal d'audit. Renvoie null si le compte n'existe pas.
+    /// <summary>
+    /// Dernier recours en ligne de commande, si plus aucun administrateur ne peut se connecter. Réservé à qui a accès
+    /// au serveur ; tracé dans le journal d'audit. Renvoie null si le compte n'existe pas.
+    /// </summary>
+    /// <param name="services">Services de l'application.</param>
+    /// <param name="email">Identifiant du compte.</param>
+    /// <returns>Le mot de passe provisoire, ou null.</returns>
     public static async Task<string?> ReinitialiserMotDePasseAsync(IServiceProvider services, string email)
     {
         using var scope = services.CreateScope();
@@ -31,6 +42,11 @@ public static class Demarrage
         return provisoire;
     }
 
+    /// <summary>
+    /// Applique les migrations, crée les niveaux L1 à M2 sur une base vide, le premier administrateur s'il n'existe
+    /// aucun compte, et le jeu d'essai si demandé.
+    /// </summary>
+    /// <param name="services">Services de l'application.</param>
     public static async Task PreparerAsync(IServiceProvider services)
     {
         using var scope = services.CreateScope();
@@ -108,9 +124,17 @@ public static class Demarrage
     }
 }
 
-// Jeu d'essai fictif, chargé seulement sur une base vide et si Demarrage:DonneesDemo vaut true (jamais chez un client)
+/// <summary>
+/// Jeu d'essai fictif, chargé seulement sur une base vide et si Demarrage:DonneesDemo vaut true (jamais chez un
+/// client)
+/// </summary>
 public static class DonneesDemo
 {
+    /// <summary>
+    /// Charge le jeu d'essai : filières, UE, enseignants, étudiants, inscriptions, cours, tarifs, paiement, notes,
+    /// salles, séances, absence et bourse. Ne fait rien si la base contient déjà des filières ou des personnes.
+    /// </summary>
+    /// <param name="db">Contexte de base de données.</param>
     public static async Task ChargerAsync(ApplicationDbContext db)
     {
         if (await db.Filieres.AnyAsync() || await db.Utilisateurs.AnyAsync()) return;

@@ -7,11 +7,18 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
-// Assiduité : feuille d'appel par séance, et récapitulatif des absences par étudiant sur une année
+/// <summary>Assiduité : feuille d'appel par séance, et récapitulatif des absences par étudiant sur une année</summary>
 public class AbsencesController : AppController
 {
+    /// <summary>Crée le contrôleur.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     public AbsencesController(ApplicationDbContext context) : base(context) { }
 
+    /// <summary>Récapitulatif des absences d'une année, par étudiant : nombre, heures, heures non justifiées.</summary>
+    /// <param name="anneeId">Année académique ; par défaut l'année en cours, sinon la plus récente.</param>
+    /// <param name="filiereId">Filtre facultatif sur la filière.</param>
+    /// <param name="niveauId">Filtre facultatif sur le niveau.</param>
+    /// <param name="q">Recherche facultative sur le nom, le prénom ou le matricule.</param>
     public async Task<IActionResult> Index(int? anneeId, int? filiereId, int? niveauId, string? q)
     {
         var annee = await AnneeOuCouranteAsync(anneeId);
@@ -24,6 +31,11 @@ public class AbsencesController : AppController
         return View(annee == null ? new List<LigneAssiduite>() : await RecapitulatifAsync(annee.Id, filiereId, niveauId, q));
     }
 
+    /// <summary>Exporte le récapitulatif d'assiduité en CSV, avec les mêmes filtres que la liste.</summary>
+    /// <param name="anneeId">Année académique.</param>
+    /// <param name="filiereId">Filtre facultatif sur la filière.</param>
+    /// <param name="niveauId">Filtre facultatif sur le niveau.</param>
+    /// <param name="q">Recherche facultative sur l'étudiant.</param>
     public async Task<IActionResult> Exporter(int anneeId, int? filiereId, int? niveauId, string? q)
     {
         var lignes = await RecapitulatifAsync(anneeId, filiereId, niveauId, q);
@@ -37,7 +49,10 @@ public class AbsencesController : AppController
         return File(contenu, "text/csv", "assiduite.csv");
     }
 
-    // Lien depuis la fiche d'une séance : une absence se consulte et se corrige sur la feuille d'appel
+    /// <summary>
+    /// Lien depuis la fiche d'une séance : une absence se consulte et se corrige sur la feuille d'appel
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Details(int? id)
     {
         var absence = id == null ? null : await _context.Absences.FindAsync(id);
@@ -45,9 +60,19 @@ public class AbsencesController : AppController
         return RedirectToAction(nameof(Appel), new { seanceId = absence.SeanceId });
     }
 
+    /// <summary>
+    /// Affiche la feuille d'appel d'une séance : étudiants attendus, avec leurs absences déjà relevées.
+    /// </summary>
+    /// <param name="seanceId">Séance de l'emploi du temps.</param>
     [HttpGet]
     public async Task<IActionResult> Appel(int seanceId) => await AfficherAppelAsync(seanceId);
 
+    /// <summary>
+    /// Enregistre la feuille d'appel : crée, modifie ou efface les absences. Seuls les étudiants attendus sont pris
+    /// en compte.
+    /// </summary>
+    /// <param name="seanceId">Séance de l'emploi du temps.</param>
+    /// <param name="lignes">Une ligne par étudiant : absent, justifiée, motif.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Appel(int seanceId, List<SaisieAbsence> lignes)
@@ -176,6 +201,16 @@ public class AbsencesController : AppController
     }
 }
 
+/// <summary>Une ligne de la feuille d'appel affichée.</summary>
+/// <param name="Inscription">Inscription de l'étudiant attendu.</param>
+/// <param name="Absent">Absence relevée.</param>
+/// <param name="Justifiee">Absence justifiée.</param>
+/// <param name="Motif">Motif de l'absence, facultatif.</param>
 public sealed record LigneAppel(Inscription Inscription, bool Absent, bool Justifiee, string? Motif);
 
+/// <summary>Une ligne du récapitulatif d'assiduité : un étudiant et ses absences sur l'année.</summary>
+/// <param name="Inscription">Inscription de l'étudiant.</param>
+/// <param name="Absences">Nombre de séances manquées.</param>
+/// <param name="Heures">Total des heures d'absence.</param>
+/// <param name="HeuresNonJustifiees">Heures d'absence non justifiées.</param>
 public sealed record LigneAssiduite(Inscription Inscription, int Absences, decimal Heures, decimal HeuresNonJustifiees);

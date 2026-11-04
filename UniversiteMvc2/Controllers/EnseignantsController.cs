@@ -7,10 +7,16 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
+/// <summary>Gestion des enseignants : identité, contact, grade, spécialité et cours assurés.</summary>
 public class EnseignantsController : AppController
 {
+    /// <summary>Crée le contrôleur.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     public EnseignantsController(ApplicationDbContext context) : base(context) { }
 
+    /// <summary>Liste paginée des enseignants, avec leurs cours.</summary>
+    /// <param name="q">Recherche sur le nom, le prénom, l'e-mail ou la spécialité.</param>
+    /// <param name="page">Numéro de page.</param>
     public async Task<IActionResult> Index(string? q, int page = 1)
     {
         var requete = _context.Enseignants.AsNoTracking().Include(e => e.Cours).AsQueryable();
@@ -25,6 +31,9 @@ public class EnseignantsController : AppController
         return View(await ListePaginee<Enseignant>.CreerAsync(requete.OrderBy(e => e.Nom).ThenBy(e => e.Prenom), page));
     }
 
+    /// <summary>Affiche la fiche d'un enseignant, avec ses cours.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
+    /// <returns>La fiche, ou 404 si l'élément n'existe pas.</returns>
     public async Task<IActionResult> Details(int? id)
     {
         if (id == null) return NotFound();
@@ -39,12 +48,18 @@ public class EnseignantsController : AppController
         return View(enseignant);
     }
 
+    /// <summary>Affiche le formulaire de création d'un enseignant.</summary>
     public IActionResult Create()
     {
         RemplirListes();
         return View("Formulaire", new Enseignant());
     }
 
+    /// <summary>
+    /// Enregistre l'enseignant, puis ouvre sa fiche ; en cas d'erreur, réaffiche le
+    /// formulaire.
+    /// </summary>
+    /// <param name="enseignant">Valeurs saisies (seuls les champs du formulaire sont liés).</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create([Bind("Nom,Prenom,Email,Telephone,Grade,Specialite")] Enseignant enseignant)
@@ -62,6 +77,8 @@ public class EnseignantsController : AppController
         return View("Formulaire", enseignant);
     }
 
+    /// <summary>Affiche le formulaire de modification d'un enseignant.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Edit(int? id)
     {
         if (id == null) return NotFound();
@@ -73,6 +90,11 @@ public class EnseignantsController : AppController
         return View("Formulaire", enseignant);
     }
 
+    /// <summary>
+    /// Enregistre les modifications d'un enseignant, puis revient sur sa fiche ; en cas d'erreur, réaffiche le
+    /// formulaire.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id)
@@ -91,6 +113,8 @@ public class EnseignantsController : AppController
         return View("Formulaire", enseignant);
     }
 
+    /// <summary>Affiche la confirmation de suppression d'un enseignant ; ses cours restent, sans enseignant.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Delete(int? id)
     {
         if (id == null) return NotFound();
@@ -104,6 +128,8 @@ public class EnseignantsController : AppController
             effets: Si((cours, $"{Formats.Pluriel(cours, "cours")} {(cours > 1 ? "deviendront" : "deviendra")} « non attribué »." )));
     }
 
+    /// <summary>Supprime l'enseignant après confirmation, puis revient à la liste.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(int id)

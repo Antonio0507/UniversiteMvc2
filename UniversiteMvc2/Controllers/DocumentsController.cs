@@ -12,16 +12,26 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
-// Formulaire de génération des documents PDF (attestation, relevé, liste, reçu, procès-verbal)
+/// <summary>Formulaire de génération des documents PDF (attestation, relevé, liste, reçu, procès-verbal)</summary>
 public class DocumentsController : AppController
 {
     private readonly Etablissement _etablissement;
 
+    /// <summary>Crée le contrôleur.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
+    /// <param name="etablissement">Identité de l'établissement imprimée sur les PDF.</param>
     public DocumentsController(ApplicationDbContext context, IOptions<Etablissement> etablissement) : base(context)
     {
         _etablissement = etablissement.Value;
     }
 
+    /// <summary>Affiche le formulaire de génération, éventuellement pré-rempli depuis une autre page.</summary>
+    /// <param name="type">Document proposé par défaut.</param>
+    /// <param name="inscriptionId">Inscription pré-sélectionnée.</param>
+    /// <param name="paiementId">Paiement pré-sélectionné.</param>
+    /// <param name="anneeAcadId">Année pré-sélectionnée.</param>
+    /// <param name="filiereId">Filière pré-sélectionnée.</param>
+    /// <param name="niveauId">Niveau pré-sélectionné.</param>
     [HttpGet]
     public async Task<IActionResult> Index(TypeDocument type = TypeDocument.AttestationInscription,
         int? inscriptionId = null, int? paiementId = null, int? anneeAcadId = null, int? filiereId = null, int? niveauId = null)
@@ -40,6 +50,11 @@ public class DocumentsController : AppController
         return View(demande);
     }
 
+    /// <summary>
+    /// Génère le PDF demandé et l'ouvre dans le navigateur ; si une condition manque, réaffiche le formulaire avec
+    /// l'explication.
+    /// </summary>
+    /// <param name="demande">Type de document, critères, signataire, lieu et date.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Index(DemandeDocument demande)
@@ -50,7 +65,11 @@ public class DocumentsController : AppController
         return View(demande);
     }
 
-    // Raccourci depuis une fiche (inscription ou paiement) : PDF direct avec les réglages par défaut
+    /// <summary>
+    /// Raccourci depuis une fiche (inscription ou paiement) : PDF direct avec les réglages par défaut
+    /// </summary>
+    /// <param name="type">Document à produire.</param>
+    /// <param name="id">Inscription, ou paiement pour un reçu.</param>
     [HttpGet]
     public async Task<IActionResult> Telecharger(TypeDocument type, int id)
     {

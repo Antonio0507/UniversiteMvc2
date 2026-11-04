@@ -9,37 +9,46 @@ using UniversiteMvc2.Infrastructure;
 
 namespace UniversiteMvc2.Controllers;
 
-// Liste, fiche, création, modification et suppression pour n'importe quelle entité.
-// Les vues viennent de Views/Shared/Generique, sauf si le contrôleur a ses propres vues.
-// Nouveau module = modèle + DbSet + une ligne dans Navigation + :
-//     public class SallesController : CrudController<Salle>
-//     {
-//         public SallesController(ApplicationDbContext context) : base(context) { }
-//     }
+/// <summary>
+/// Liste, fiche, création, modification et suppression pour n'importe quelle entité. Les vues viennent de
+/// Views/Shared/Generique, sauf si le contrôleur a ses propres vues. Nouveau module = modèle + DbSet + une ligne dans
+/// Navigation + une classe qui hérite de CrudController&lt;T&gt;.
+/// </summary>
 public abstract class CrudController<T> : AppController where T : class, new()
 {
+    /// <summary>Initialise le contrôleur générique.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     protected CrudController(ApplicationDbContext context) : base(context) { }
 
     private Modeles Modeles => HttpContext.RequestServices.GetRequiredService<Modeles>();
 
+    /// <summary>Description de l'entité gérée : colonnes, groupes de champs, collections liées.</summary>
     protected DescriptionModele Description => Modeles.Decrire(typeof(T));
 
     // --- Points d'extension -------------------------------------------------
 
+    /// <summary>Crée l'élément de départ d'un formulaire de création (valeurs par défaut).</summary>
+    /// <returns>Le nouvel élément, non enregistré.</returns>
     protected virtual Task<T> NouvelleAsync() => Task.FromResult(new T());
 
-    // Mise en forme avant validation (majuscules, espaces…)
+    /// <summary>Mise en forme avant validation (majuscules, espaces…)</summary>
+    /// <param name="entite">Élément saisi.</param>
     protected virtual void Normaliser(T entite) { }
 
-    // Règles métier : ajouter les erreurs dans ModelState
+    /// <summary>Règles métier : ajouter les erreurs dans ModelState</summary>
+    /// <param name="entite">Élément saisi, déjà normalisé.</param>
     protected virtual Task ValiderAsync(T entite) => Task.CompletedTask;
 
+    /// <summary>Ordre de la liste ; par défaut, l'ordre de création.</summary>
+    /// <param name="requete">Requête à trier.</param>
     protected virtual IQueryable<T> Trier(IQueryable<T> requete) => requete.OrderBy(e => EF.Property<int>(e, "Id"));
 
-    // Données supplémentaires à charger pour la liste et la fiche (références de références…)
+    /// <summary>Données supplémentaires à charger pour la liste et la fiche (références de références…)</summary>
+    /// <param name="requete">Requête de la liste ou de la fiche.</param>
     protected virtual IQueryable<T> Inclure(IQueryable<T> requete) => requete;
 
-    // Listes déroulantes des clés étrangères ; une liste déjà placée dans ViewData est conservée
+    /// <summary>Listes déroulantes des clés étrangères ; une liste déjà placée dans ViewData est conservée</summary>
+    /// <param name="entite">Élément affiché dans le formulaire (sert à pré-sélectionner les valeurs).</param>
     protected virtual async Task RemplirListesAsync(T entite)
     {
         foreach (var champ in Description.Champs.Where(c => c.Cible != null && !ViewData.ContainsKey(c.Nom)))
@@ -55,6 +64,9 @@ public abstract class CrudController<T> : AppController where T : class, new()
 
     // --- Actions ------------------------------------------------------------
 
+    /// <summary>Liste paginée, avec recherche dans toutes les colonnes texte.</summary>
+    /// <param name="q">Texte recherché, facultatif.</param>
+    /// <param name="page">Numéro de page, à partir de 1.</param>
     [HttpGet]
     public virtual async Task<IActionResult> Index(string? q, int page = 1)
     {
@@ -71,6 +83,9 @@ public abstract class CrudController<T> : AppController where T : class, new()
         return View(await ListePaginee<T>.CreerAsync(Trier(requete.AsSplitQuery()), page));
     }
 
+    /// <summary>Affiche la fiche d'un élément, avec ses collections liées.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
+    /// <returns>La fiche, ou 404 si l'élément n'existe pas.</returns>
     [HttpGet]
     public virtual async Task<IActionResult> Details(int? id)
     {
@@ -90,6 +105,7 @@ public abstract class CrudController<T> : AppController where T : class, new()
         return View(entite);
     }
 
+    /// <summary>Affiche le formulaire de création.</summary>
     [HttpGet]
     public virtual async Task<IActionResult> Create()
     {
@@ -98,6 +114,7 @@ public abstract class CrudController<T> : AppController where T : class, new()
         return View("Formulaire", entite);
     }
 
+    /// <summary>Enregistre un nouvel élément, puis ouvre sa fiche ; en cas d'erreur, réaffiche le formulaire.</summary>
     [HttpPost, ActionName("Create")]
     [ValidateAntiForgeryToken]
     public virtual async Task<IActionResult> CreatePost()
@@ -116,6 +133,8 @@ public abstract class CrudController<T> : AppController where T : class, new()
         return View("Formulaire", entite);
     }
 
+    /// <summary>Affiche le formulaire de modification d'un élément.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpGet]
     public virtual async Task<IActionResult> Edit(int? id)
     {
@@ -128,6 +147,11 @@ public abstract class CrudController<T> : AppController where T : class, new()
         return View("Formulaire", entite);
     }
 
+    /// <summary>
+    /// Enregistre les modifications d'un élément, puis revient sur sa fiche ; en cas d'erreur, réaffiche le
+    /// formulaire.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost, ActionName("Edit")]
     [ValidateAntiForgeryToken]
     public virtual async Task<IActionResult> EditPost(int id)
@@ -144,6 +168,11 @@ public abstract class CrudController<T> : AppController where T : class, new()
         return View("Formulaire", entite);
     }
 
+    /// <summary>
+    /// Affiche la confirmation de suppression. Ce qui bloque ou ce qui sera supprimé avec est déduit des règles de
+    /// suppression du modèle EF Core.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpGet]
     public virtual async Task<IActionResult> Delete(int? id)
     {
@@ -183,6 +212,8 @@ public abstract class CrudController<T> : AppController where T : class, new()
         return ConfirmerSuppression($"Supprimer {Description.Entite.Le}", Libelles.Texte(entite), id.Value, blocages, effets);
     }
 
+    /// <summary>Supprime l'élément après confirmation, puis revient à la liste.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public virtual async Task<IActionResult> DeleteConfirmed(int id)
@@ -195,7 +226,9 @@ public abstract class CrudController<T> : AppController where T : class, new()
 
     // --- Outils -------------------------------------------------------------
 
-    // Ne lie que les champs du formulaire (protection contre l'overposting)
+    /// <summary>Ne lie que les champs du formulaire (protection contre l'overposting)</summary>
+    /// <param name="entite">Élément à remplir.</param>
+    /// <returns>true si la saisie est valide, règles métier comprises.</returns>
     protected async Task<bool> AppliquerSaisieAsync(T entite)
     {
         var editables = Description.Champs.Select(c => c.Nom).ToHashSet();
@@ -205,6 +238,10 @@ public abstract class CrudController<T> : AppController where T : class, new()
         return ModelState.IsValid;
     }
 
+    /// <summary>
+    /// Ajoute à la requête les références directes de l'entité (clés étrangères), pour les afficher par leur nom.
+    /// </summary>
+    /// <param name="requete">Requête à compléter.</param>
     protected IQueryable<TEntite> AvecReferences<TEntite>(IQueryable<TEntite> requete) where TEntite : class
     {
         foreach (var reference in Modeles.Decrire(typeof(TEntite)).References)

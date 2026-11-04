@@ -7,8 +7,11 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
+/// <summary>Gestion des inscriptions : un étudiant, une année, une filière, un niveau et un statut.</summary>
 public class InscriptionsController : AppController
 {
+    /// <summary>Crée le contrôleur.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     public InscriptionsController(ApplicationDbContext context) : base(context) { }
 
     private IQueryable<Inscription> Filtrer(string? q, int? anneeId, int? filiereId, string? statut)
@@ -32,6 +35,12 @@ public class InscriptionsController : AppController
         return requete;
     }
 
+    /// <summary>Liste paginée des inscriptions, la plus récente d'abord.</summary>
+    /// <param name="q">Recherche sur l'étudiant.</param>
+    /// <param name="anneeId">Filtre par année.</param>
+    /// <param name="filiereId">Filtre par filière.</param>
+    /// <param name="statut">Filtre par statut.</param>
+    /// <param name="page">Numéro de page.</param>
     public async Task<IActionResult> Index(string? q, int? anneeId, int? filiereId, string? statut, int page = 1)
     {
         var requete = Filtrer(q, anneeId, filiereId, statut);
@@ -45,6 +54,11 @@ public class InscriptionsController : AppController
         return View(await ListePaginee<Inscription>.CreerAsync(tri, page));
     }
 
+    /// <summary>Exporte les inscriptions en CSV, avec les mêmes filtres que la liste.</summary>
+    /// <param name="q">Recherche sur l'étudiant.</param>
+    /// <param name="anneeId">Filtre par année.</param>
+    /// <param name="filiereId">Filtre par filière.</param>
+    /// <param name="statut">Filtre par statut.</param>
     public async Task<IActionResult> Exporter(string? q, int? anneeId, int? filiereId, string? statut)
     {
         var inscriptions = await Filtrer(q, anneeId, filiereId, statut)
@@ -60,6 +74,12 @@ public class InscriptionsController : AppController
         return File(contenu, "text/csv", "inscriptions.csv");
     }
 
+    /// <summary>
+    /// Affiche la fiche d'une inscription : solde (tarif, aides, versé, reste), paiements, notes et décision, aides,
+    /// absences.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
+    /// <returns>La fiche, ou 404 si l'élément n'existe pas.</returns>
     public async Task<IActionResult> Details(int? id)
     {
         if (id == null) return NotFound();
@@ -85,6 +105,8 @@ public class InscriptionsController : AppController
         return View(inscription);
     }
 
+    /// <summary>Affiche le formulaire d'inscription, avec l'année en cours pré-sélectionnée.</summary>
+    /// <param name="etudiantId">Étudiant pré-sélectionné, facultatif.</param>
     public async Task<IActionResult> Create(int? etudiantId)
     {
         var inscription = new Inscription { EtudiantId = etudiantId ?? 0 };
@@ -99,6 +121,11 @@ public class InscriptionsController : AppController
         return View("Formulaire", inscription);
     }
 
+    /// <summary>
+    /// Enregistre l'inscription (une seule par étudiant et par année), puis ouvre sa
+    /// fiche ; en cas d'erreur, réaffiche le formulaire.
+    /// </summary>
+    /// <param name="inscription">Valeurs saisies (seuls les champs du formulaire sont liés).</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create([Bind("DateInscription,Statut,EtudiantId,FiliereId,NiveauId,AnneeAcadId")] Inscription inscription)
@@ -117,6 +144,8 @@ public class InscriptionsController : AppController
         return View("Formulaire", inscription);
     }
 
+    /// <summary>Affiche le formulaire de modification d'une inscription.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Edit(int? id)
     {
         if (id == null) return NotFound();
@@ -128,6 +157,11 @@ public class InscriptionsController : AppController
         return View("Formulaire", inscription);
     }
 
+    /// <summary>
+    /// Enregistre les modifications d'une inscription, puis revient sur sa fiche ; en cas d'erreur, réaffiche le
+    /// formulaire.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id)
@@ -149,7 +183,9 @@ public class InscriptionsController : AppController
         return View("Formulaire", inscription);
     }
 
-    // Changement rapide de statut depuis la fiche (Valider / Annuler / Remettre en attente)
+    /// <summary>Changement rapide de statut depuis la fiche (Valider / Annuler / Remettre en attente)</summary>
+    /// <param name="id">Identifiant de l'inscription.</param>
+    /// <param name="statut">Nouveau statut : En attente, Validée ou Annulée.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Statut(int id, string statut)
@@ -164,6 +200,11 @@ public class InscriptionsController : AppController
         return RedirectToAction(nameof(Details), new { id });
     }
 
+    /// <summary>
+    /// Affiche la confirmation de suppression d'une inscription, avec ce qui l'empêche : paiements, notes, aides ou
+    /// absences enregistrés.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Delete(int? id)
     {
         if (id == null) return NotFound();
@@ -183,6 +224,8 @@ public class InscriptionsController : AppController
                 (absences, $"{Formats.Pluriel(absences, "absence relevée", "absences relevées")} sur cette inscription.")));
     }
 
+    /// <summary>Supprime l'inscription après confirmation, puis revient à la liste.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(int id)

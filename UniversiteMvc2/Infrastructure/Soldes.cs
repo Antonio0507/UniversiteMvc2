@@ -4,31 +4,51 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Infrastructure;
 
+/// <summary>Une inscription dont le reste à payer est positif.</summary>
+/// <param name="Inscription">Inscription validée.</param>
+/// <param name="Du">Frais dus, aides déduites.</param>
+/// <param name="Verse">Total des versements.</param>
 public sealed record LigneImpaye(Inscription Inscription, decimal Du, decimal Verse)
 {
+    /// <summary>Reste à payer, jamais négatif.</summary>
     public decimal Reste => Math.Max(0, Du - Verse);
 }
 
-// Calcule ce que doit une inscription à partir des tarifs, des bourses et exonérations, et des versements
+/// <summary>
+/// Calcule ce que doit une inscription à partir des tarifs, des bourses et exonérations, et des versements
+/// </summary>
 public static class Soldes
 {
+    /// <summary>Tarif annuel qui s'applique à une inscription (année, filière, niveau).</summary>
+    /// <param name="context">Contexte de base de données.</param>
+    /// <param name="inscription">Inscription.</param>
+    /// <returns>Le montant, ou null s'il n'y a pas de tarif.</returns>
     public static async Task<decimal?> TarifDeAsync(this ApplicationDbContext context, Inscription inscription) =>
         await context.Tarifs
             .Where(t => t.AnneeAcadId == inscription.AnneeAcadId && t.FiliereId == inscription.FiliereId && t.NiveauId == inscription.NiveauId)
             .Select(t => (decimal?)t.Montant)
             .FirstOrDefaultAsync();
 
+    /// <summary>Total des bourses et exonérations accordées sur une inscription.</summary>
+    /// <param name="context">Contexte de base de données.</param>
+    /// <param name="inscriptionId">Identifiant de l'inscription.</param>
     public static async Task<decimal> AidesDeAsync(this ApplicationDbContext context, int inscriptionId) =>
         await context.Aides.Where(a => a.InscriptionId == inscriptionId).SumAsync(a => (decimal?)a.Montant) ?? 0;
 
-    // Frais de scolarité, aides déduites ; null si aucun tarif ne s'applique
+    /// <summary>Frais de scolarité, aides déduites ; null si aucun tarif ne s'applique</summary>
+    /// <param name="context">Contexte de base de données.</param>
+    /// <param name="inscription">Inscription.</param>
     public static async Task<decimal?> DuAsync(this ApplicationDbContext context, Inscription inscription)
     {
         var tarif = await context.TarifDeAsync(inscription);
         return tarif == null ? null : Solde.Net(tarif.Value, await context.AidesDeAsync(inscription.Id));
     }
 
-    // Inscriptions validées de l'année dont le tarif n'est pas entièrement réglé, les plus gros restes d'abord
+    /// <summary>
+    /// Inscriptions validées de l'année dont le tarif n'est pas entièrement réglé, les plus gros restes d'abord
+    /// </summary>
+    /// <param name="context">Contexte de base de données.</param>
+    /// <param name="anneeId">Année académique.</param>
     public static async Task<List<LigneImpaye>> ImpayesAsync(this ApplicationDbContext context, int anneeId)
     {
         var tarifs = await context.Tarifs.AsNoTracking().Where(t => t.AnneeAcadId == anneeId).ToListAsync();

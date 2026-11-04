@@ -9,23 +9,33 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
-// Gestion des comptes du personnel (administrateurs uniquement, voir Navigation).
-// Les comptes se désactivent mais ne se suppriment pas : le journal d'audit continue à les référencer.
+/// <summary>
+/// Gestion des comptes du personnel (administrateurs uniquement, voir Navigation). Les comptes se désactivent mais ne
+/// se suppriment pas : le journal d'audit continue à les référencer.
+/// </summary>
 public class ComptesController : AppController
 {
     private readonly PasswordHasher<Compte> _hacheur = new();
 
+    /// <summary>Crée le contrôleur.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     public ComptesController(ApplicationDbContext context) : base(context) { }
 
+    /// <summary>Liste des comptes du personnel, avec profil, état et dernière connexion.</summary>
     public async Task<IActionResult> Index() =>
         View(await _context.Comptes.AsNoTracking().OrderBy(c => c.Nom).ToListAsync());
 
+    /// <summary>Affiche le formulaire de création d'un compte.</summary>
     public IActionResult Create()
     {
         RemplirListes();
         return View("Formulaire", new Compte());
     }
 
+    /// <summary>
+    /// Crée un compte avec un mot de passe provisoire, affiché une seule fois pour être transmis à la personne.
+    /// </summary>
+    /// <param name="compte">E-mail, nom et profil saisis.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create([Bind("Email,Nom,Role")] Compte compte)
@@ -50,6 +60,8 @@ public class ComptesController : AppController
         return View("Formulaire", compte);
     }
 
+    /// <summary>Affiche le formulaire de modification d'un compte.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Edit(int? id)
     {
         if (id == null) return NotFound();
@@ -61,6 +73,11 @@ public class ComptesController : AppController
         return View("Formulaire", compte);
     }
 
+    /// <summary>
+    /// Enregistre le nom, le profil et l'état du compte. Un changement de droits ferme ses sessions ; le dernier
+    /// administrateur actif ne peut pas être retiré.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id)
@@ -92,6 +109,11 @@ public class ComptesController : AppController
         return View("Formulaire", compte);
     }
 
+    /// <summary>
+    /// Réinitialise le mot de passe d'un compte (mot de passe oublié) : nouveau provisoire, compte déverrouillé,
+    /// sessions fermées.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Reinitialiser(int id)

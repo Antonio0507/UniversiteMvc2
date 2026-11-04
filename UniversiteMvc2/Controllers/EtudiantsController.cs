@@ -6,10 +6,15 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
+/// <summary>Gestion des dossiers étudiants : identité, matricule, contact et inscriptions.</summary>
 public class EtudiantsController : AppController
 {
+    /// <summary>Crée le contrôleur.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     public EtudiantsController(ApplicationDbContext context) : base(context) { }
 
+    /// <summary>Exporte les étudiants en CSV, avec la même recherche que la liste.</summary>
+    /// <param name="q">Recherche facultative.</param>
     public async Task<IActionResult> Exporter(string? q)
     {
         var requete = _context.Etudiants.AsNoTracking();
@@ -25,6 +30,9 @@ public class EtudiantsController : AppController
         return File(contenu, "text/csv", "etudiants.csv");
     }
 
+    /// <summary>Liste paginée des étudiants, avec leurs inscriptions.</summary>
+    /// <param name="q">Recherche sur le nom, le prénom, le matricule ou l'e-mail.</param>
+    /// <param name="page">Numéro de page.</param>
     public async Task<IActionResult> Index(string? q, int page = 1)
     {
         var requete = _context.Etudiants.AsNoTracking()
@@ -43,6 +51,9 @@ public class EtudiantsController : AppController
         return View(await ListePaginee<Etudiant>.CreerAsync(requete.OrderBy(e => e.Nom).ThenBy(e => e.Prenom), page));
     }
 
+    /// <summary>Affiche la fiche d'un étudiant, avec toutes ses inscriptions et ce qui a été versé.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
+    /// <returns>La fiche, ou 404 si l'élément n'existe pas.</returns>
     public async Task<IActionResult> Details(int? id)
     {
         if (id == null) return NotFound();
@@ -59,9 +70,17 @@ public class EtudiantsController : AppController
         return View(etudiant);
     }
 
+    /// <summary>
+    /// Affiche le formulaire de création, avec le matricule suivant de l'année proposé (ETU2026001, ETU2026002…).
+    /// </summary>
     public async Task<IActionResult> Create() =>
         View("Formulaire", new Etudiant { Matricule = await ProchainMatriculeAsync(), DateNaissance = new DateTime(2005, 1, 1) });
 
+    /// <summary>
+    /// Enregistre le dossier, puis ouvre sa fiche ; en cas d'erreur, réaffiche le
+    /// formulaire.
+    /// </summary>
+    /// <param name="etudiant">Valeurs saisies (seuls les champs du formulaire sont liés).</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create([Bind("Nom,Prenom,Email,Telephone,Matricule,DateNaissance")] Etudiant etudiant)
@@ -78,6 +97,8 @@ public class EtudiantsController : AppController
         return View("Formulaire", etudiant);
     }
 
+    /// <summary>Affiche le formulaire de modification d'un dossier étudiant.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Edit(int? id)
     {
         if (id == null) return NotFound();
@@ -88,6 +109,11 @@ public class EtudiantsController : AppController
         return View("Formulaire", etudiant);
     }
 
+    /// <summary>
+    /// Enregistre les modifications d'un dossier étudiant, puis revient sur sa fiche ; en cas d'erreur, réaffiche le
+    /// formulaire.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id)
@@ -105,6 +131,11 @@ public class EtudiantsController : AppController
         return View("Formulaire", etudiant);
     }
 
+    /// <summary>
+    /// Affiche la confirmation de suppression d'un dossier étudiant, avec ce qui l'empêche : les inscriptions
+    /// rattachées.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Delete(int? id)
     {
         if (id == null) return NotFound();
@@ -117,6 +148,8 @@ public class EtudiantsController : AppController
             blocages: Si((inscriptions, $"{Formats.Pluriel(inscriptions, "inscription rattachée", "inscriptions rattachées")} à ce dossier.")));
     }
 
+    /// <summary>Supprime le dossier étudiant après confirmation, puis revient à la liste.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(int id)

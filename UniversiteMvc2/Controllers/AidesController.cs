@@ -6,17 +6,23 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
-// Bourses, exonérations et réductions : vues génériques ; le montant est déduit du solde de l'inscription (Soldes)
+/// <summary>
+/// Bourses, exonérations et réductions : vues génériques ; le montant est déduit du solde de l'inscription (Soldes)
+/// </summary>
 public class AidesController : CrudController<Aide>
 {
+    /// <summary>Crée le contrôleur.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     public AidesController(ApplicationDbContext context) : base(context) { }
 
-    // Depuis la fiche d'une inscription : Aides/Create?inscriptionId=12
+    /// <summary>Depuis la fiche d'une inscription : Aides/Create?inscriptionId=12</summary>
     protected override Task<Aide> NouvelleAsync() =>
         Task.FromResult(new Aide { InscriptionId = int.TryParse(Request.Query["inscriptionId"], out var id) ? id : 0 });
 
+    /// <summary>Retire les espaces du motif ; un motif vide devient null.</summary>
     protected override void Normaliser(Aide aide) => aide.Motif = string.IsNullOrWhiteSpace(aide.Motif) ? null : aide.Motif.Trim();
 
+    /// <summary>Refuse une aide sur une inscription annulée, ou dont le total des aides dépasserait le tarif.</summary>
     protected override async Task ValiderAsync(Aide aide)
     {
         var inscription = await _context.Inscriptions.AsNoTracking().FirstOrDefaultAsync(i => i.Id == aide.InscriptionId);
@@ -39,15 +45,20 @@ public class AidesController : CrudController<Aide>
                 $"Les aides dépasseraient le tarif de l'inscription ({Formats.Montant(tarif.Value)}, dont {Formats.Montant(autres)} déjà accordés).");
     }
 
+    /// <summary>
+    /// Charge l'étudiant, la filière, le niveau et l'année de l'inscription, pour afficher le bénéficiaire.
+    /// </summary>
     protected override IQueryable<Aide> Inclure(IQueryable<Aide> requete) =>
         requete.Include(a => a.Inscription).ThenInclude(i => i!.Etudiant)
             .Include(a => a.Inscription).ThenInclude(i => i!.Filiere)
             .Include(a => a.Inscription).ThenInclude(i => i!.Niveau)
             .Include(a => a.Inscription).ThenInclude(i => i!.AnneeAcad);
 
+    /// <summary>Classe les aides de l'année la plus récente à la plus ancienne, puis par nom d'étudiant.</summary>
     protected override IQueryable<Aide> Trier(IQueryable<Aide> requete) =>
         requete.OrderByDescending(a => a.Inscription!.AnneeAcad!.DateDebut).ThenBy(a => a.Inscription!.Etudiant!.Nom);
 
+    /// <summary>Propose les inscriptions non annulées et la liste des types d'aide.</summary>
     protected override async Task RemplirListesAsync(Aide aide)
     {
         // Inscriptions annulées exclues, sauf celle déjà liée à l'aide

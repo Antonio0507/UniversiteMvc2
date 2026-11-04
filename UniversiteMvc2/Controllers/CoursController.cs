@@ -7,13 +7,20 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
+/// <summary>Gestion des cours : parties d'une UE (CM, TD, TP), avec volume horaire et enseignant.</summary>
 public class CoursController : AppController
 {
-    // Valeur du filtre « enseignant » pour les cours sans titulaire
+    /// <summary>Valeur du filtre « enseignant » pour les cours sans titulaire</summary>
     public const int NonAttribue = 0;
 
+    /// <summary>Crée le contrôleur.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     public CoursController(ApplicationDbContext context) : base(context) { }
 
+    /// <summary>Liste des cours, filtrable.</summary>
+    /// <param name="q">Recherche sur l'intitulé ou le code d'UE.</param>
+    /// <param name="enseignantId">Filtre par enseignant ; NonAttribue pour les cours sans enseignant.</param>
+    /// <param name="ueId">Filtre par UE.</param>
     public async Task<IActionResult> Index(string? q, int? enseignantId, int? ueId)
     {
         var requete = _context.Cours.AsNoTracking()
@@ -43,6 +50,9 @@ public class CoursController : AppController
         return View(liste);
     }
 
+    /// <summary>Affiche la fiche d'un cours.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
+    /// <returns>La fiche, ou 404 si l'élément n'existe pas.</returns>
     public async Task<IActionResult> Details(int? id)
     {
         if (id == null) return NotFound();
@@ -57,6 +67,9 @@ public class CoursController : AppController
         return View(cours);
     }
 
+    /// <summary>Affiche le formulaire de création d'un cours, avec 30 h par défaut.</summary>
+    /// <param name="ueId">UE pré-sélectionnée, facultative.</param>
+    /// <param name="enseignantId">Enseignant pré-sélectionné, facultatif.</param>
     public async Task<IActionResult> Create(int? ueId, int? enseignantId)
     {
         var cours = new Cours { VolumeHoraire = 30, UEId = ueId ?? 0, EnseignantId = enseignantId };
@@ -64,6 +77,11 @@ public class CoursController : AppController
         return View("Formulaire", cours);
     }
 
+    /// <summary>
+    /// Enregistre le cours, puis ouvre sa fiche ; en cas d'erreur, réaffiche le
+    /// formulaire.
+    /// </summary>
+    /// <param name="cours">Valeurs saisies (seuls les champs du formulaire sont liés).</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create([Bind("Intitule,VolumeHoraire,UEId,EnseignantId")] Cours cours)
@@ -81,6 +99,8 @@ public class CoursController : AppController
         return View("Formulaire", cours);
     }
 
+    /// <summary>Affiche le formulaire de modification d'un cours.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Edit(int? id)
     {
         if (id == null) return NotFound();
@@ -92,6 +112,10 @@ public class CoursController : AppController
         return View("Formulaire", cours);
     }
 
+    /// <summary>
+    /// Enregistre les modifications d'un cours, puis revient sur sa fiche ; en cas d'erreur, réaffiche le formulaire.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id)
@@ -109,6 +133,11 @@ public class CoursController : AppController
         return View("Formulaire", cours);
     }
 
+    /// <summary>
+    /// Affiche la confirmation de suppression d'un cours, avec ce qui l'empêche : les séances programmées à l'emploi
+    /// du temps.
+    /// </summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     public async Task<IActionResult> Delete(int? id)
     {
         if (id == null) return NotFound();
@@ -121,6 +150,8 @@ public class CoursController : AppController
             blocages: Si((seances, $"{Formats.Pluriel(seances, "séance programmée", "séances programmées")} à l'emploi du temps.")));
     }
 
+    /// <summary>Supprime le cours après confirmation, puis revient à la liste.</summary>
+    /// <param name="id">Identifiant de l'élément.</param>
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(int id)

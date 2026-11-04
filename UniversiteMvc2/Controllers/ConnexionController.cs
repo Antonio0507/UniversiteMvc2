@@ -12,10 +12,12 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
-// Connexion, déconnexion et changement de mot de passe de l'utilisateur connecté
+/// <summary>Connexion, déconnexion et changement de mot de passe de l'utilisateur connecté</summary>
 public class ConnexionController : AppController
 {
+    /// <summary>Nombre d'échecs de connexion consécutifs qui verrouille un compte.</summary>
     public const int EchecsMaximum = 5;
+    /// <summary>Durée du verrouillage d'un compte après trop d'échecs.</summary>
     public static readonly TimeSpan DureeVerrouillage = TimeSpan.FromMinutes(15);
 
     // Vérifié quand l'e-mail est inconnu, pour que le temps de réponse ne révèle pas si le compte existe
@@ -24,11 +26,16 @@ public class ConnexionController : AppController
     private readonly PasswordHasher<Compte> _hacheur = new();
     private readonly ILogger<ConnexionController> _journal;
 
+    /// <summary>Crée le contrôleur.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
+    /// <param name="journal">Logs techniques des connexions et refus.</param>
     public ConnexionController(ApplicationDbContext context, ILogger<ConnexionController> journal) : base(context)
     {
         _journal = journal;
     }
 
+    /// <summary>Affiche la page de connexion ; un utilisateur déjà connecté va au tableau de bord.</summary>
+    /// <param name="retour">Adresse locale où revenir après la connexion.</param>
     [AllowAnonymous]
     [HttpGet]
     public IActionResult Index(string? retour)
@@ -38,6 +45,13 @@ public class ConnexionController : AppController
         return View();
     }
 
+    /// <summary>
+    /// Vérifie l'identifiant et le mot de passe. Gère le verrouillage après 5 échecs, la limite par adresse IP, le
+    /// journal d'audit et le changement obligatoire d'un mot de passe provisoire.
+    /// </summary>
+    /// <param name="email">Identifiant saisi.</param>
+    /// <param name="motDePasse">Mot de passe saisi.</param>
+    /// <param name="retour">Adresse locale où revenir ; une adresse externe est ignorée.</param>
     [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -100,6 +114,7 @@ public class ConnexionController : AppController
         return !string.IsNullOrEmpty(retour) && Url.IsLocalUrl(retour) ? LocalRedirect(retour) : RedirectToAction("Index", "Home");
     }
 
+    /// <summary>Ferme la session et revient à la page de connexion.</summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Deconnexion()
@@ -113,9 +128,17 @@ public class ConnexionController : AppController
         return RedirectToAction(nameof(Index));
     }
 
+    /// <summary>Affiche le formulaire de changement de mot de passe.</summary>
     [HttpGet]
     public IActionResult MotDePasse() => View();
 
+    /// <summary>
+    /// Change le mot de passe de l'utilisateur connecté, après vérification de l'actuel et de la politique ; ferme
+    /// ses autres sessions.
+    /// </summary>
+    /// <param name="actuel">Mot de passe actuel.</param>
+    /// <param name="nouveau">Nouveau mot de passe.</param>
+    /// <param name="confirmation">Nouveau mot de passe, à nouveau.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> MotDePasse(string? actuel, string? nouveau, string? confirmation)

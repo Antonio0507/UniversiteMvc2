@@ -4,16 +4,24 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Infrastructure.Pdf;
 
+/// <summary>
+/// Attestation d'inscription : certifie qu'un étudiant est inscrit pour l'année (inscription validée).
+/// </summary>
 public class AttestationInscription : DocumentRegistre
 {
     private readonly Inscription _inscription;
 
+    /// <summary>Prépare l'attestation.</summary>
+    /// <param name="etablissement">Identité de l'établissement (en-tête et pied de page).</param>
+    /// <param name="demande">Signataire, lieu, date et critères saisis dans le formulaire.</param>
+    /// <param name="inscription">Inscription, avec étudiant, filière, niveau et année.</param>
     public AttestationInscription(Etablissement etablissement, DemandeDocument demande, Inscription inscription)
         : base(etablissement, demande, "Attestation d'inscription", $"ATT-{inscription.AnneeAcad?.Libelle}-{inscription.Id:00000}")
     {
         _inscription = inscription;
     }
 
+    /// <inheritdoc/>
     protected override void Contenu(IContainer conteneur) => conteneur.Column(colonne =>
     {
         var etudiant = _inscription.Etudiant!;
@@ -47,11 +55,19 @@ public class AttestationInscription : DocumentRegistre
     });
 }
 
+/// <summary>
+/// Relevé des paiements : tous les versements d'une inscription, avec le total arrêté et le reste à payer.
+/// </summary>
 public class RelevePaiements : DocumentRegistre
 {
     private readonly Inscription _inscription;
     private readonly decimal? _du;
 
+    /// <summary>Prépare le relevé.</summary>
+    /// <param name="etablissement">Identité de l'établissement (en-tête et pied de page).</param>
+    /// <param name="demande">Signataire, lieu, date et critères saisis dans le formulaire.</param>
+    /// <param name="inscription">Inscription, avec ses paiements.</param>
+    /// <param name="du">Frais dus, aides déduites ; null sans tarif.</param>
     public RelevePaiements(Etablissement etablissement, DemandeDocument demande, Inscription inscription, decimal? du)
         : base(etablissement, demande, "Relevé des paiements", $"REL-{inscription.AnneeAcad?.Libelle}-{inscription.Id:00000}")
     {
@@ -59,6 +75,7 @@ public class RelevePaiements : DocumentRegistre
         _du = du;
     }
 
+    /// <inheritdoc/>
     protected override void Contenu(IContainer conteneur) => conteneur.Column(colonne =>
     {
         var etudiant = _inscription.Etudiant!;
@@ -124,11 +141,17 @@ public class RelevePaiements : DocumentRegistre
     });
 }
 
+/// <summary>Liste des inscrits d'une année, avec filtres facultatifs.</summary>
 public class ListeInscrits : DocumentRegistre
 {
     private readonly IReadOnlyList<Inscription> _inscriptions;
     private readonly string _criteres;
 
+    /// <summary>Prépare la liste.</summary>
+    /// <param name="etablissement">Identité de l'établissement (en-tête et pied de page).</param>
+    /// <param name="demande">Signataire, lieu, date et critères saisis dans le formulaire.</param>
+    /// <param name="inscriptions">Inscriptions à lister, déjà triées.</param>
+    /// <param name="criteres">Critères appliqués, imprimés sous le titre.</param>
     public ListeInscrits(Etablissement etablissement, DemandeDocument demande, IReadOnlyList<Inscription> inscriptions, string criteres)
         : base(etablissement, demande, "Liste des inscrits", $"LST-{demande.DateDocument:yyyyMMdd}")
     {
@@ -136,6 +159,7 @@ public class ListeInscrits : DocumentRegistre
         _criteres = criteres;
     }
 
+    /// <inheritdoc/>
     protected override void Contenu(IContainer conteneur) => conteneur.Column(colonne =>
     {
         colonne.Spacing(12);
@@ -189,11 +213,17 @@ public class ListeInscrits : DocumentRegistre
     });
 }
 
+/// <summary>Reçu d'un versement, avec le cumul versé et le reste à payer à cette date.</summary>
 public class RecuPaiement : DocumentRegistre
 {
     private readonly Paiement _paiement;
     private readonly decimal? _du;
 
+    /// <summary>Prépare le reçu.</summary>
+    /// <param name="etablissement">Identité de l'établissement (en-tête et pied de page).</param>
+    /// <param name="demande">Signataire, lieu, date et critères saisis dans le formulaire.</param>
+    /// <param name="paiement">Paiement, avec son inscription et tous ses versements.</param>
+    /// <param name="du">Frais dus, aides déduites ; null sans tarif.</param>
     public RecuPaiement(Etablissement etablissement, DemandeDocument demande, Paiement paiement, decimal? du)
         : base(etablissement, demande, "Reçu de paiement", Formats.NumeroRecu(paiement.Id))
     {
@@ -201,6 +231,7 @@ public class RecuPaiement : DocumentRegistre
         _du = du;
     }
 
+    /// <inheritdoc/>
     protected override void Contenu(IContainer conteneur) => conteneur.Column(colonne =>
     {
         var inscription = _paiement.Inscription!;
@@ -238,11 +269,17 @@ public class RecuPaiement : DocumentRegistre
     });
 }
 
+/// <summary>Relevé de notes : chaque UE du cursus, moyenne pondérée et crédits validés (inscription validée).</summary>
 public class ReleveNotes : DocumentRegistre
 {
     private readonly Inscription _inscription;
     private readonly IReadOnlyList<UE> _ues;
 
+    /// <summary>Prépare le relevé.</summary>
+    /// <param name="etablissement">Identité de l'établissement (en-tête et pied de page).</param>
+    /// <param name="demande">Signataire, lieu, date et critères saisis dans le formulaire.</param>
+    /// <param name="inscription">Inscription, avec ses notes.</param>
+    /// <param name="ues">UE de la filière et du niveau, triées par code.</param>
     public ReleveNotes(Etablissement etablissement, DemandeDocument demande, Inscription inscription, IReadOnlyList<UE> ues)
         : base(etablissement, demande, "Relevé de notes", $"NOT-{inscription.AnneeAcad?.Libelle}-{inscription.Id:00000}")
     {
@@ -250,6 +287,7 @@ public class ReleveNotes : DocumentRegistre
         _ues = ues;
     }
 
+    /// <inheritdoc/>
     protected override void Contenu(IContainer conteneur) => conteneur.Column(colonne =>
     {
         var etudiant = _inscription.Etudiant!;
@@ -314,6 +352,10 @@ public class ReleveNotes : DocumentRegistre
     });
 }
 
+/// <summary>
+/// Procès-verbal de délibération d'une promotion : effectif, taux d'admis, puis rang, moyenne, crédits et décision de
+/// chaque étudiant.
+/// </summary>
 public class ProcesVerbal : DocumentRegistre
 {
     private readonly AnneeAcad _annee;
@@ -321,6 +363,13 @@ public class ProcesVerbal : DocumentRegistre
     private readonly Niveau _niveau;
     private readonly IReadOnlyList<LigneDeliberation> _lignes;
 
+    /// <summary>Prépare le procès-verbal.</summary>
+    /// <param name="etablissement">Identité de l'établissement (en-tête et pied de page).</param>
+    /// <param name="demande">Signataire, lieu, date et critères saisis dans le formulaire.</param>
+    /// <param name="annee">Année académique.</param>
+    /// <param name="filiere">Filière.</param>
+    /// <param name="niveau">Niveau.</param>
+    /// <param name="lignes">Résultats calculés par Deliberations.CalculerAsync.</param>
     public ProcesVerbal(Etablissement etablissement, DemandeDocument demande, AnneeAcad annee, Filiere filiere, Niveau niveau, IReadOnlyList<LigneDeliberation> lignes)
         : base(etablissement, demande, "Procès-verbal de délibération", $"PV-{annee.Libelle}-{filiere.Code}-{niveau.Code}")
     {
@@ -330,6 +379,7 @@ public class ProcesVerbal : DocumentRegistre
         _lignes = lignes;
     }
 
+    /// <inheritdoc/>
     protected override void Contenu(IContainer conteneur) => conteneur.Column(colonne =>
     {
         var admis = _lignes.Count(l => l.Bilan.Admis);

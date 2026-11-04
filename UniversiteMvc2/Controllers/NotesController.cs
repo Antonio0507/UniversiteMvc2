@@ -6,11 +6,18 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
-// Grille de saisie des notes : une UE, une année, tous les étudiants inscrits (inscriptions validées)
+/// <summary>
+/// Grille de saisie des notes : une UE, une année, tous les étudiants inscrits (inscriptions validées)
+/// </summary>
 public class NotesController : AppController
 {
+    /// <summary>Crée le contrôleur.</summary>
+    /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     public NotesController(ApplicationDbContext context) : base(context) { }
 
+    /// <summary>Affiche la grille d'une UE pour une année.</summary>
+    /// <param name="anneeId">Année ; par défaut l'année en cours, sinon la plus récente.</param>
+    /// <param name="ueId">UE dont on saisit les notes.</param>
     [HttpGet]
     public async Task<IActionResult> Index(int? anneeId, int? ueId)
     {
@@ -24,6 +31,13 @@ public class NotesController : AppController
         return await AfficherAsync(anneeId, ueId);
     }
 
+    /// <summary>
+    /// Enregistre la grille : crée, modifie ou supprime les notes (deux cases vides suppriment la note). Une note
+    /// hors barème bloque tout l'enregistrement.
+    /// </summary>
+    /// <param name="anneeId">Année de la grille.</param>
+    /// <param name="ueId">UE de la grille.</param>
+    /// <param name="lignes">Une ligne par étudiant : session normale et rattrapage.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Index(int anneeId, int ueId, List<SaisieNote> lignes)
@@ -114,4 +128,9 @@ public class NotesController : AppController
     }
 }
 
+/// <summary>Une ligne de la grille de notes affichée.</summary>
+/// <param name="Inscription">Inscription de l'étudiant.</param>
+/// <param name="Valeur">Note de session normale.</param>
+/// <param name="Rattrapage">Note de rattrapage.</param>
+/// <param name="Retenue">Note retenue en base (meilleure des deux).</param>
 public sealed record LigneNote(Inscription Inscription, decimal? Valeur, decimal? Rattrapage, decimal? Retenue);

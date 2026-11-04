@@ -4,9 +4,14 @@ using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 
 namespace UniversiteMvc2.Infrastructure;
 
-// Messages de validation en français, sans avoir à les répéter sur chaque attribut des modèles
+/// <summary>Messages de validation en français, sans avoir à les répéter sur chaque attribut des modèles</summary>
 public class MessagesValidationFr : IValidationMetadataProvider
 {
+    /// <summary>
+    /// Remplace les messages anglais par défaut des attributs de validation par leur version française ; un message
+    /// écrit dans le modèle est conservé.
+    /// </summary>
+    /// <param name="context">Métadonnées de la propriété en cours de description.</param>
     public void CreateValidationMetadata(ValidationMetadataProviderContext context)
     {
         foreach (var attribut in context.ValidationMetadata.ValidatorMetadata.OfType<ValidationAttribute>())
@@ -38,6 +43,8 @@ public class MessagesValidationFr : IValidationMetadataProvider
         return attribut.ErrorMessage != neuf.ErrorMessage;
     }
 
+    /// <summary>Branche les messages français dans MVC (Program.cs).</summary>
+    /// <param name="options">Options MVC.</param>
     public static void Configurer(MvcOptions options)
     {
         options.ModelMetadataDetailsProviders.Add(new MessagesValidationFr());
