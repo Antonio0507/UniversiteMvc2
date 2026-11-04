@@ -58,6 +58,10 @@ public class Inscription
 
     public ICollection<Note> Notes { get; set; } = new List<Note>();
 
+    public ICollection<Aide> Aides { get; set; } = new List<Aide>();
+
+    public ICollection<Absence> Absences { get; set; } = new List<Absence>();
+
     public override string ToString() =>
         $"{Etudiant?.NomComplet} · {Filiere?.Nom} {Niveau?.Code} · {AnneeAcad?.Libelle}";
 }

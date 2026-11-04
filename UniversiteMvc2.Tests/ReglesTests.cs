@@ -45,6 +45,50 @@ public class ReglesTests
     [Fact]
     public void Une_note_de_10_valide_l_UE() => Assert.Equal(6, Bilan.Calculer([(6, 10m)]).CreditsValides);
 
+    [Theory]
+    // Notes de deux UE (6 et 4 crédits) ; null = pas de note
+    [InlineData(12.0, 10.0, Decisions.Admis)]
+    [InlineData(14.0, 8.0, Decisions.AdmisCompensation)]
+    [InlineData(9.0, 9.5, Decisions.Ajourne)]
+    [InlineData(15.0, null, Decisions.Incomplet)]
+    public void La_decision_du_jury_suit_credits_compensation_et_notes_manquantes(double premiere, double? seconde, string attendu) =>
+        Assert.Equal(attendu, Bilan.Calculer([(6, (decimal)premiere), (4, (decimal?)seconde)]).Decision);
+
+    [Fact]
+    public void Sans_UE_le_jury_ne_peut_pas_se_prononcer() => Assert.Equal(Decisions.Incomplet, Bilan.Calculer([]).Decision);
+
+    [Fact]
+    public void Les_ex_aequo_partagent_leur_rang_et_sans_moyenne_pas_de_rang()
+    {
+        var promotion = new decimal?[] { 12m, 15m, 12m, 9m, null }
+            .Select(m => (new Inscription(), new Bilan(m, 0, 0, m == null ? 1 : 0)));
+
+        var rangs = Deliberations.Classer(promotion).Select(l => l.Rang).ToList();
+
+        Assert.Equal([2, 1, 2, 4, null], rangs);
+    }
+
+    [Fact]
+    public void Les_aides_reduisent_le_du_sans_le_rendre_negatif()
+    {
+        Assert.Equal(250000m, Solde.Net(350000m, 100000m));
+        Assert.Equal(0m, Solde.Net(100000m, 150000m));
+    }
+
+    [Theory]
+    [InlineData(8, 10, 10, 12, false)]
+    [InlineData(8, 10, 9, 11, true)]
+    [InlineData(8, 12, 9, 10, true)]
+    public void Deux_seances_le_meme_jour_se_chevauchent_si_leurs_horaires_se_croisent(int debutA, int finA, int debutB, int finB, bool attendu)
+    {
+        var jour = new DateTime(2026, 11, 2);
+        var a = new Seance { Date = jour, HeureDebut = TimeSpan.FromHours(debutA), HeureFin = TimeSpan.FromHours(finA) };
+        var b = new Seance { Date = jour, HeureDebut = TimeSpan.FromHours(debutB), HeureFin = TimeSpan.FromHours(finB) };
+
+        Assert.Equal(attendu, a.Chevauche(b));
+        Assert.False(a.Chevauche(new Seance { Date = jour.AddDays(1), HeureDebut = a.HeureDebut, HeureFin = a.HeureFin }));
+    }
+
     [Fact]
     public void Le_reste_a_payer_ne_devient_jamais_negatif()
     {
@@ -114,6 +158,15 @@ public class ReglesTests
     [InlineData(Roles.Comptabilite, "Notes", "Index", true, true)]
     [InlineData(Roles.Administrateur, "Comptes", "Reinitialiser", false, true)]
     [InlineData(Roles.Administrateur, "Journal", "Index", true, true)]
+    [InlineData(Roles.Scolarite, "Seances", "Create", true, true)]
+    [InlineData(Roles.Scolarite, "Absences", "Appel", false, true)]
+    [InlineData(Roles.Scolarite, "Aides", "Create", true, false)]
+    [InlineData(Roles.Comptabilite, "Aides", "Create", false, true)]
+    [InlineData(Roles.Comptabilite, "Absences", "Appel", false, false)]
+    [InlineData(Roles.Consultation, "Absences", "Appel", true, true)]
+    [InlineData(Roles.Consultation, "Deliberations", "Index", true, true)]
+    [InlineData(Roles.Consultation, "Deliberations", "Exporter", true, false)]
+    [InlineData(Roles.Consultation, "Salles", "Edit", true, false)]
     public void Matrice_des_droits(string role, string controleur, string action, bool lecture, bool attendu) =>
         Assert.Equal(attendu, Droits.Autorise(Profil(role), controleur, action, lecture));
 }

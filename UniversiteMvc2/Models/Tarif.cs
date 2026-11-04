@@ -41,8 +41,11 @@ public class Tarif
     public override string ToString() => $"{Filiere?.Code} {Niveau?.Code} · {AnneeAcad?.Libelle}";
 }
 
-// Situation financière d'une inscription ; Du est null tant qu'aucun tarif ne s'applique
+// Situation financière d'une inscription ; Du (aides déduites) est null tant qu'aucun tarif ne s'applique
 public sealed record Solde(decimal? Du, decimal Verse)
 {
     public decimal? Reste => Du == null ? null : Math.Max(0, Du.Value - Verse);
+
+    // Frais de scolarité après bourses et exonérations, jamais négatifs
+    public static decimal Net(decimal tarif, decimal aides) => Math.Max(0, tarif - aides);
 }

@@ -1,0 +1,76 @@
+@model List<UniversiteMvc2.Controllers.LigneAssiduite>
+@{
+    ViewData["Title"] = "Assiduité";
+    var annee = ViewData["annee"] as AnneeAcad;
+    var q = ViewData["q"] as string;
+    IEnumerable<SelectListItem> Liste(string nom) => (IEnumerable<SelectListItem>)ViewData[nom]!;
+    var filtres = Context.Request.Query.ToDictionary(p => p.Key, p => p.Value.ToString());
+    filtres["anneeId"] = annee?.Id.ToString() ?? "";
+}
+
+<header class="entete">
+    <div>
+        <h1>Assiduité</h1>
+        <p class="entete__resume">
+            @(annee?.Libelle ?? "Aucune année") · @Formats.Pluriel(Model.Count, "étudiant absent", "étudiants absents")
+            · @Formats.Heures(Model.Sum(l => l.Heures)) d'absence dont @Formats.Heures(Model.Sum(l => l.HeuresNonJustifiees)) non justifiées
+        </p>
+    </div>
+    <div class="entete__actions">
+        @if (annee != null)
+        {
+            <a asp-action="Exporter" asp-all-route-data="filtres" class="btn">Exporter (CSV)</a>
+        }
+        <a asp-controller="Seances" asp-action="Index" class="btn btn--plein">Faire l'appel</a>
+    </div>
+</header>
+
+<form method="get" class="filtres" role="search">
+    <label class="filtres__recherche">
+        <span class="sr">Rechercher un étudiant</span>
+        <input type="search" name="q" value="@q" placeholder="Nom ou matricule" data-recherche />
+        <kbd>/</kbd>
+    </label>
+    <label class="sr" for="anneeId">Année</label>
+    <select id="anneeId" name="anneeId" asp-items='Liste("AnneeId")'></select>
+    <label class="sr" for="filiereId">Filière</label>
+    <select id="filiereId" name="filiereId" asp-items='Liste("FiliereId")'><option value="">Toutes les filières</option></select>
+    <label class="sr" for="niveauId">Niveau</label>
+    <select id="niveauId" name="niveauId" asp-items='Liste("NiveauId")'><option value="">Tous les niveaux</option></select>
+    <button class="btn" type="submit">Filtrer</button>
+</form>
+
+@if (Model.Count == 0)
+{
+    <p class="vide">Aucune absence relevée pour ces critères. L'appel se fait depuis l'<a asp-controller="Seances" asp-action="Index">emploi du temps</a>.</p>
+}
+else
+{
+    <div class="defilement">
+        <table class="registre">
+            <thead>
+                <tr>
+                    <th>Matricule</th>
+                    <th>Étudiant</th>
+                    <th class="masquer-etroit">Promotion</th>
+                    <th class="num">Absences</th>
+                    <th class="num">Heures</th>
+                    <th class="num">Non justifiées</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var l in Model)
+                {
+                    <tr>
+                        <td class="mono">@l.Inscription.Etudiant?.Matricule</td>
+                        <td><a asp-controller="Inscriptions" asp-action="Details" asp-route-id="@l.Inscription.Id" class="lien-fort">@l.Inscription.Etudiant?.NomComplet</a></td>
+                        <td class="mono masquer-etroit">@l.Inscription.Filiere?.Code · @l.Inscription.Niveau?.Code</td>
+                        <td class="num">@l.Absences</td>
+                        <td class="num">@Formats.Heures(l.Heures)</td>
+                        <td class="num">@(l.HeuresNonJustifiees > 0 ? Formats.Heures(l.HeuresNonJustifiees) : "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

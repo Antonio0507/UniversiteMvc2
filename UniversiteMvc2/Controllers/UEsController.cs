@@ -114,7 +114,9 @@ public class UEsController : AppController
 
         // OnDelete(Cascade) : les cours de l'UE partent avec elle
         var cours = await _context.Cours.CountAsync(c => c.UEId == id);
+        var seances = await _context.Seances.CountAsync(s => s.Cours!.UEId == id);
         return ConfirmerSuppression("Supprimer l'unité d'enseignement", $"{ue.Code} — {ue.Intitule}", ue.Id,
+            blocages: Si((seances, $"{Formats.Pluriel(seances, "séance programmée", "séances programmées")} pour ses cours à l'emploi du temps.")),
             effets: Si((cours, $"{Formats.Pluriel(cours, "cours")} {(cours > 1 ? "seront supprimés" : "sera supprimé")} avec elle.")));
     }
 

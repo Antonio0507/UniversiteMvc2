@@ -19,6 +19,63 @@ namespace UniversiteMvc2.Data.Migrations
                 .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
+            modelBuilder.Entity("UniversiteMvc2.Models.Absence", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<int>("InscriptionId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Justifiee")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Motif")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<int>("SeanceId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InscriptionId");
+
+                    b.HasIndex("SeanceId", "InscriptionId")
+                        .IsUnique();
+
+                    b.ToTable("Absences");
+                });
+
+            modelBuilder.Entity("UniversiteMvc2.Models.Aide", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<int>("InscriptionId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Montant")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Motif")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InscriptionId");
+
+                    b.ToTable("Aides");
+                });
+
             modelBuilder.Entity("UniversiteMvc2.Models.AnneeAcad", b =>
                 {
                     b.Property<int>("Id")
@@ -310,6 +367,75 @@ namespace UniversiteMvc2.Data.Migrations
                     b.ToTable("Paiements");
                 });
 
+            modelBuilder.Entity("UniversiteMvc2.Models.Salle", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<int>("Capacite")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("Nom")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Salles");
+                });
+
+            modelBuilder.Entity("UniversiteMvc2.Models.Seance", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<int>("CoursId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<TimeSpan>("HeureDebut")
+                        .HasColumnType("time(6)");
+
+                    b.Property<TimeSpan>("HeureFin")
+                        .HasColumnType("time(6)");
+
+                    b.Property<int?>("SalleId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CoursId");
+
+                    b.HasIndex("Date");
+
+                    b.HasIndex("SalleId");
+
+                    b.ToTable("Seances");
+                });
+
             modelBuilder.Entity("UniversiteMvc2.Models.Tarif", b =>
                 {
                     b.Property<int>("Id")
@@ -452,6 +578,36 @@ namespace UniversiteMvc2.Data.Migrations
                     b.HasDiscriminator().HasValue("Etudiant");
                 });
 
+            modelBuilder.Entity("UniversiteMvc2.Models.Absence", b =>
+                {
+                    b.HasOne("UniversiteMvc2.Models.Inscription", "Inscription")
+                        .WithMany("Absences")
+                        .HasForeignKey("InscriptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("UniversiteMvc2.Models.Seance", "Seance")
+                        .WithMany("Absences")
+                        .HasForeignKey("SeanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Inscription");
+
+                    b.Navigation("Seance");
+                });
+
+            modelBuilder.Entity("UniversiteMvc2.Models.Aide", b =>
+                {
+                    b.HasOne("UniversiteMvc2.Models.Inscription", "Inscription")
+                        .WithMany("Aides")
+                        .HasForeignKey("InscriptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Inscription");
+                });
+
             modelBuilder.Entity("UniversiteMvc2.Models.Cours", b =>
                 {
                     b.HasOne("UniversiteMvc2.Models.Enseignant", "Enseignant")
@@ -535,6 +691,24 @@ namespace UniversiteMvc2.Data.Migrations
                     b.Navigation("Inscription");
                 });
 
+            modelBuilder.Entity("UniversiteMvc2.Models.Seance", b =>
+                {
+                    b.HasOne("UniversiteMvc2.Models.Cours", "Cours")
+                        .WithMany("Seances")
+                        .HasForeignKey("CoursId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("UniversiteMvc2.Models.Salle", "Salle")
+                        .WithMany("Seances")
+                        .HasForeignKey("SalleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Cours");
+
+                    b.Navigation("Salle");
+                });
+
             modelBuilder.Entity("UniversiteMvc2.Models.Tarif", b =>
                 {
                     b.HasOne("UniversiteMvc2.Models.AnneeAcad", "AnneeAcad")
@@ -586,6 +760,11 @@ namespace UniversiteMvc2.Data.Migrations
                     b.Navigation("Inscriptions");
                 });
 
+            modelBuilder.Entity("UniversiteMvc2.Models.Cours", b =>
+                {
+                    b.Navigation("Seances");
+                });
+
             modelBuilder.Entity("UniversiteMvc2.Models.Filiere", b =>
                 {
                     b.Navigation("Inscriptions");
@@ -595,6 +774,10 @@ namespace UniversiteMvc2.Data.Migrations
 
             modelBuilder.Entity("UniversiteMvc2.Models.Inscription", b =>
                 {
+                    b.Navigation("Absences");
+
+                    b.Navigation("Aides");
+
                     b.Navigation("Notes");
 
                     b.Navigation("Paiements");
@@ -605,6 +788,16 @@ namespace UniversiteMvc2.Data.Migrations
                     b.Navigation("Inscriptions");
 
                     b.Navigation("UEs");
+                });
+
+            modelBuilder.Entity("UniversiteMvc2.Models.Salle", b =>
+                {
+                    b.Navigation("Seances");
+                });
+
+            modelBuilder.Entity("UniversiteMvc2.Models.Seance", b =>
+                {
+                    b.Navigation("Absences");
                 });
 
             modelBuilder.Entity("UniversiteMvc2.Models.UE", b =>

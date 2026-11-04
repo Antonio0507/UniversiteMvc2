@@ -115,7 +115,7 @@ public class RelevePaiements : DocumentRegistre
             t.Span(".");
             if (new Solde(_du, total).Reste is { } reste)
             {
-                t.Span($" Frais de scolarité : {Charte.Texte(Formats.Montant(_du!.Value))}. Reste à payer : ");
+                t.Span($" Frais de scolarité (aides déduites) : {Charte.Texte(Formats.Montant(_du!.Value))}. Reste à payer : ");
                 t.Span(Charte.Texte(Formats.Montant(reste))).SemiBold();
                 t.Span(".");
             }
@@ -230,7 +230,7 @@ public class RecuPaiement : DocumentRegistre
             ("Cumul versé à cette date", Formats.Montant(cumul)),
             ("Nombre de versements", jusquIci.Count.ToString()),
             ("Statut de l'inscription", inscription.Statut),
-            ("Frais de scolarité", _du == null ? "—" : Formats.Montant(_du.Value)),
+            ("Frais dus (aides déduites)", _du == null ? "—" : Formats.Montant(_du.Value)),
             ("Reste à payer à cette date", new Solde(_du, cumul).Reste is { } reste ? Formats.Montant(reste) : "—")
         ]));
 
@@ -310,6 +310,77 @@ public class ReleveNotes : DocumentRegistre
             if (bilan.UESansNote > 0)
                 t.Span($" Relevé provisoire : {Formats.Pluriel(bilan.UESansNote, "UE")} sans note.");
         });
+        colonne.Item().PaddingTop(24).Element(Signature);
+    });
+}
+
+public class ProcesVerbal : DocumentRegistre
+{
+    private readonly AnneeAcad _annee;
+    private readonly Filiere _filiere;
+    private readonly Niveau _niveau;
+    private readonly IReadOnlyList<LigneDeliberation> _lignes;
+
+    public ProcesVerbal(Etablissement etablissement, DemandeDocument demande, AnneeAcad annee, Filiere filiere, Niveau niveau, IReadOnlyList<LigneDeliberation> lignes)
+        : base(etablissement, demande, "Procès-verbal de délibération", $"PV-{annee.Libelle}-{filiere.Code}-{niveau.Code}")
+    {
+        _annee = annee;
+        _filiere = filiere;
+        _niveau = niveau;
+        _lignes = lignes;
+    }
+
+    protected override void Contenu(IContainer conteneur) => conteneur.Column(colonne =>
+    {
+        var admis = _lignes.Count(l => l.Bilan.Admis);
+        colonne.Spacing(14);
+
+        colonne.Item().Element(c => Fiche(c,
+        [
+            ("Année académique", _annee.Libelle),
+            ("Filière", _filiere.Nom),
+            ("Niveau", _niveau.Libelle),
+            ("Étudiants délibérés", _lignes.Count.ToString()),
+            ("Admis", $"{admis} ({(admis * 100.0 / _lignes.Count).ToString("0", Formats.Fr)} %)"),
+            ("Ajournés / incomplets", (_lignes.Count - admis).ToString())
+        ]));
+
+        colonne.Item().PaddingTop(8).Table(table =>
+        {
+            table.ColumnsDefinition(d =>
+            {
+                d.ConstantColumn(34);
+                d.ConstantColumn(78);
+                d.RelativeColumn();
+                d.ConstantColumn(52);
+                d.ConstantColumn(52);
+                d.ConstantColumn(104);
+            });
+            table.Header(h =>
+            {
+                h.Cell().Element(CelluleEntete).Text("RANG");
+                h.Cell().Element(CelluleEntete).Text("MATRICULE");
+                h.Cell().Element(CelluleEntete).Text("ÉTUDIANT");
+                h.Cell().Element(CelluleEntete).AlignRight().Text("MOY.");
+                h.Cell().Element(CelluleEntete).AlignRight().Text("CRÉD.");
+                h.Cell().Element(CelluleEntete).Text("DÉCISION");
+            });
+
+            foreach (var l in _lignes)
+            {
+                table.Cell().Element(Cellule).Text(l.Rang?.ToString() ?? "—");
+                table.Cell().Element(Cellule).Text(Charte.Texte(l.Inscription.Etudiant?.Matricule));
+                table.Cell().Element(Cellule).Text(Charte.Texte(l.Inscription.Etudiant?.NomComplet));
+                table.Cell().Element(Cellule).AlignRight().Text(Formats.Note(l.Bilan.Moyenne));
+                table.Cell().Element(Cellule).AlignRight().Text($"{l.Bilan.CreditsValides}/{l.Bilan.CreditsTotal}");
+                table.Cell().Element(Cellule).Text(l.Bilan.Decision).SemiBold();
+            }
+        });
+
+        colonne.Item().PaddingTop(6).Text(
+            $"Une UE est validée à partir de {Formats.Note(Note.Seuil)}/20. Sans toutes ses UE, un étudiant est admis par compensation " +
+            $"si sa moyenne pondérée atteint {Formats.Note(Note.Seuil)}/20. « Incomplet » : au moins une UE sans note.")
+            .FontSize(8.5f).FontColor(Charte.Encre3);
         colonne.Item().PaddingTop(24).Element(Signature);
     });
 }

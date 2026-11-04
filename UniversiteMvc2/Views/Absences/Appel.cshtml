@@ -1,0 +1,69 @@
+@model List<UniversiteMvc2.Controllers.LigneAppel>
+@{
+    var seance = (Seance)ViewData["seance"]!;
+    var annee = ViewData["annee"] as AnneeAcad;
+    ViewData["Title"] = $"Appel — {seance.Cours?.Intitule}";
+    var peutSaisir = Droits.PeutEcrire(User, "Absences");
+}
+
+<header class="entete">
+    <div>
+        <p class="entete__sur">Feuille d'appel · @seance.Type</p>
+        <h1>@seance.Cours?.Intitule</h1>
+        <p class="entete__resume">@Formats.Jour(seance.Date) @seance.Date.Year · @Formats.Heure(seance.HeureDebut)–@Formats.Heure(seance.HeureFin) · @seance.Cours?.UE?.Filiere?.Code @seance.Cours?.UE?.Niveau?.Code · salle @(seance.Salle?.Code ?? "—")</p>
+    </div>
+    <div class="entete__actions">
+        <a asp-controller="Seances" asp-action="Details" asp-route-id="@seance.Id" class="btn">Fiche de la séance</a>
+    </div>
+</header>
+
+@if (annee == null)
+{
+    <p class="vide">La date de cette séance n'appartient à aucune année académique : impossible de savoir quels étudiants sont attendus. <a asp-controller="AnneesAcad" asp-action="Index">Vérifier les années académiques</a></p>
+}
+else if (Model.Count == 0)
+{
+    <p class="vide">Aucune inscription validée en @seance.Cours?.UE?.Filiere?.Code @seance.Cours?.UE?.Niveau?.Code pour @annee.Libelle.</p>
+}
+else
+{
+    <form asp-action="Appel" asp-route-seanceId="@seance.Id" method="post">
+        <div asp-validation-summary="ModelOnly" class="resume-erreurs"></div>
+        <p class="entete__resume">Cochez les absents. Une absence justifiée reste comptée, mais à part. @Formats.Pluriel(Model.Count, "étudiant attendu", "étudiants attendus") · @Formats.Pluriel(Model.Count(l => l.Absent), "absent").</p>
+        <div class="defilement">
+            <table class="registre">
+                <thead>
+                    <tr>
+                        <th>Matricule</th>
+                        <th>Étudiant</th>
+                        <th>Absent</th>
+                        <th>Justifiée</th>
+                        <th>Motif</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < Model.Count; i++)
+                    {
+                        var ligne = Model[i];
+                        var nom = ligne.Inscription.Etudiant?.NomComplet;
+                        <tr>
+                            <td class="mono">@ligne.Inscription.Etudiant?.Matricule</td>
+                            <td><a asp-controller="Inscriptions" asp-action="Details" asp-route-id="@ligne.Inscription.Id" class="lien-fort">@nom</a></td>
+                            <td>
+                                <input type="hidden" name="lignes[@i].InscriptionId" value="@ligne.Inscription.Id" />
+                                <input type="checkbox" name="lignes[@i].Absent" value="true" checked="@ligne.Absent" disabled="@(!peutSaisir)" aria-label="Absent : @nom" />
+                            </td>
+                            <td><input type="checkbox" name="lignes[@i].Justifiee" value="true" checked="@ligne.Justifiee" disabled="@(!peutSaisir)" aria-label="Absence justifiée : @nom" /></td>
+                            <td><input class="saisie-note" style="width: 100%" type="text" name="lignes[@i].Motif" value="@ligne.Motif" maxlength="200" readonly="@(!peutSaisir)" aria-label="Motif : @nom" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="formulaire__actions">
+            <button type="submit" class="btn btn--plein">Enregistrer l'appel</button>
+        </div>
+    </form>
+}
+
+<a class="retour" asp-controller="Seances" asp-action="Index" asp-route-semaine="@seance.Date.ToString("yyyy-MM-dd")">← Emploi du temps de la semaine</a>

@@ -17,7 +17,10 @@ public enum TypeDocument
     RecuPaiement,
 
     [Display(Name = "Relevé de notes", Description = "Notes retenues, moyenne pondérée et crédits validés. Inscriptions validées uniquement.")]
-    ReleveNotes
+    ReleveNotes,
+
+    [Display(Name = "Procès-verbal de délibération", Description = "Résultats d'une promotion : rang, moyenne, crédits et décision. Année, filière et niveau requis.")]
+    ProcesVerbal
 }
 
 // Formulaire de génération d'un document PDF ; les champs utiles dépendent du type choisi

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using UniversiteMvc2.Data;
+using UniversiteMvc2.Infrastructure;
 using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
@@ -115,7 +116,9 @@ public class CoursController : AppController
         var cours = await _context.Cours.Include(c => c.UE).FirstOrDefaultAsync(c => c.Id == id);
         if (cours == null) return NotFound();
 
-        return ConfirmerSuppression("Supprimer le cours", $"{cours.Intitule} ({cours.UE?.Code})", cours.Id);
+        var seances = await _context.Seances.CountAsync(s => s.CoursId == id);
+        return ConfirmerSuppression("Supprimer le cours", $"{cours.Intitule} ({cours.UE?.Code})", cours.Id,
+            blocages: Si((seances, $"{Formats.Pluriel(seances, "séance programmée", "séances programmées")} à l'emploi du temps.")));
     }
 
     [HttpPost, ActionName("Delete")]

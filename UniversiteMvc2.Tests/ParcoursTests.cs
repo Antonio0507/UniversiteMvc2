@@ -1,12 +1,18 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 using MySql.Data.MySqlClient;
 using UniversiteMvc2.Data;
+using UniversiteMvc2.Infrastructure;
 using UniversiteMvc2.Models;
 using Xunit;
 
@@ -35,8 +41,14 @@ public sealed class Application : WebApplicationFactory<Program>
 
     public int EssaisParMinute { get; init; } = 1000;
 
+    // Tout ce que l'application écrit dans ses logs pendant le test
+    public ConcurrentQueue<string> Logs { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.ConfigureLogging(logs => logs.AddProvider(new CapteurLogs(Logs)));
+        builder.ConfigureTestServices(services => services.AddControllersWithViews().AddApplicationPart(typeof(Application).Assembly));
+
         using (var connexion = new MySqlConnection(_serveur))
         {
             connexion.Open();
@@ -77,6 +89,24 @@ public sealed class Application : WebApplicationFactory<Program>
         using var commande = new MySqlCommand($"DROP DATABASE IF EXISTS `{_base}`", connexion);
         commande.ExecuteNonQuery();
     }
+}
+
+public sealed class CapteurLogs(ConcurrentQueue<string> logs) : ILoggerProvider, ILogger
+{
+    public ILogger CreateLogger(string categorie) => this;
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+    public bool IsEnabled(LogLevel niveau) => niveau >= LogLevel.Information;
+    public void Dispose() { }
+
+    public void Log<TState>(LogLevel niveau, EventId id, TState state, Exception? erreur, Func<TState, Exception?, string> format) =>
+        logs.Enqueue($"{niveau}: {format(state, erreur)} {erreur?.Message}");
+}
+
+// Simule une panne imprévue : seuls les tests connaissent cette page
+[AllowAnonymous]
+public class PanneController : Controller
+{
+    public IActionResult Index() => throw new InvalidOperationException("detail-interne-secret");
 }
 
 public static class Pages
@@ -307,10 +337,14 @@ public class ParcoursTests
             ["AnneesAcad"] = await db.AnneesAcad.Select(e => e.Id).FirstAsync(),
             ["Inscriptions"] = inscription,
             ["Paiements"] = paiement,
-            ["Tarifs"] = tarif
+            ["Tarifs"] = tarif,
+            ["Salles"] = await db.Salles.Select(e => e.Id).FirstAsync(),
+            ["Seances"] = await db.Seances.Select(e => e.Id).FirstAsync(),
+            ["Aides"] = await db.Aides.Select(e => e.Id).FirstAsync()
         });
 
-        var urls = new List<string> { "/", "/Notes", "/Documents", "/Comptes", "/Comptes/Create", "/Journal", "/Paiements/Impayes", "/Connexion/MotDePasse" };
+        var urls = new List<string> { "/", "/Notes", "/Documents", "/Comptes", "/Comptes/Create", "/Journal", "/Paiements/Impayes", "/Connexion/MotDePasse",
+            "/Absences", $"/Absences/Appel?seanceId={ids["Seances"]}", "/Deliberations", $"/Aides/Create?inscriptionId={inscription}" };
         foreach (var (controleur, id) in ids)
             urls.AddRange([$"/{controleur}", $"/{controleur}/Create", $"/{controleur}/Details/{id}", $"/{controleur}/Edit/{id}", $"/{controleur}/Delete/{id}"]);
 
@@ -380,6 +414,89 @@ public class ParcoursTests
 
         var fiche = await admin.GetStringAsync($"/Inscriptions/Details/{inscription}");
         Assert.Contains("Relevé de notes PDF", fiche);
+    }
+
+    [MySqlFact]
+    public async Task L_emploi_du_temps_refuse_les_conflits_et_l_appel_alimente_l_assiduite()
+    {
+        using var app = new Application();
+        var admin = await app.AdminAsync();
+        // Démonstration : « Algorithmique - CM » le lundi de la semaine, de 8 h à 10 h, en AMPHI-A, par KOFFI
+        var (seance, coursSql, inscription, annee) = await app.AvecBaseAsync(async db => (
+            await db.Seances.AsNoTracking().FirstAsync(s => s.Cours!.Intitule == "Algorithmique - CM" && s.Type != Seance.Examen),
+            await db.Cours.Where(c => c.Intitule == "SQL et modélisation").Select(c => c.Id).FirstAsync(),
+            await db.Inscriptions.Where(i => i.Statut == Inscription.Validee).Select(i => i.Id).FirstAsync(),
+            await db.AnneesAcad.Select(a => a.Id).FirstAsync()));
+        var date = seance.Date.ToString("yyyy-MM-dd");
+
+        // Même salle, même enseignant, même promotion, horaires qui se croisent
+        var conflit = await admin.EnvoyerAsync("/Seances/Create", "/Seances/Create",
+            ("CoursId", coursSql.ToString()), ("Type", "Travaux dirigés"), ("Date", date), ("HeureDebut", "09:00"), ("HeureFin", "11:00"),
+            ("SalleId", seance.SalleId.ToString()!));
+        Assert.Equal(HttpStatusCode.OK, conflit.StatusCode);
+        var texte = await conflit.TexteAsync();
+        Assert.Contains("déjà occupée", texte);
+        Assert.Contains("assure déjà", texte);
+
+        var libre = await admin.EnvoyerAsync("/Seances/Create", "/Seances/Create",
+            ("CoursId", coursSql.ToString()), ("Type", "Travaux dirigés"), ("Date", date), ("HeureDebut", "10:00"), ("HeureFin", "11:30"), ("SalleId", ""));
+        Assert.Equal(HttpStatusCode.Redirect, libre.StatusCode);
+
+        // L'absence justifiée de la démonstration devient non justifiée
+        var appel = $"/Absences/Appel?seanceId={seance.Id}";
+        var enregistre = await admin.EnvoyerAsync(appel, appel,
+            ("lignes[0].InscriptionId", inscription.ToString()), ("lignes[0].Absent", "true"), ("lignes[0].Motif", ""));
+        Assert.Equal(HttpStatusCode.Redirect, enregistre.StatusCode);
+        var absence = await app.AvecBaseAsync(db => db.Absences.AsNoTracking().SingleAsync(a => a.SeanceId == seance.Id));
+        Assert.False(absence.Justifiee);
+
+        Assert.Contains("dont 2 h non justifiées", await admin.GetStringAsync($"/Absences?anneeId={annee}"));
+        Assert.Contains("AGBEKO", await admin.GetStringAsync($"/Absences/Exporter?anneeId={annee}"));
+    }
+
+    [MySqlFact]
+    public async Task Une_bourse_reduit_le_reste_a_payer_sans_depasser_le_tarif()
+    {
+        using var app = new Application();
+        var admin = await app.AdminAsync();
+        // Démonstration : tarif de 350 000, déjà 150 000 versés
+        var id = await app.AvecBaseAsync(db => db.Paiements.Select(p => p.InscriptionId).FirstAsync());
+
+        var excessive = await admin.EnvoyerAsync("/Aides/Create", "/Aides/Create",
+            ("InscriptionId", id.ToString()), ("Type", "Exonération"), ("Montant", "350001"));
+        Assert.Equal(HttpStatusCode.OK, excessive.StatusCode);
+        Assert.Contains("dépasseraient le tarif", await excessive.TexteAsync());
+
+        var bourse = await admin.EnvoyerAsync("/Aides/Create", "/Aides/Create",
+            ("InscriptionId", id.ToString()), ("Type", "Bourse sociale"), ("Montant", "100000"), ("Motif", "Commission"));
+        Assert.Equal(HttpStatusCode.Redirect, bourse.StatusCode);
+
+        // Reste : 350 000 − 100 000 − 150 000 = 100 000
+        var trop = await admin.EnvoyerAsync("/Paiements/Create", "/Paiements/Create",
+            ("InscriptionId", id.ToString()), ("Montant", "100001"), ("DatePaiement", DateTime.Today.ToString("yyyy-MM-dd")), ("Mode", "Espèces"));
+        Assert.Contains("dépasse le reste", await trop.TexteAsync());
+        Assert.Contains("Bourses et exonérations", await admin.GetStringAsync($"/Inscriptions/Details/{id}"));
+    }
+
+    [MySqlFact]
+    public async Task Les_deliberations_donnent_decisions_export_et_proces_verbal()
+    {
+        using var app = new Application();
+        var admin = await app.AdminAsync();
+        var inscription = await app.AvecBaseAsync(db => db.Inscriptions.AsNoTracking().FirstAsync(i => i.Statut == Inscription.Validee));
+
+        // Démonstration : 13,5 en INF101 et 11 (rattrapage) en INF102 : toutes les UE validées
+        var page = await admin.GetStringAsync($"/Deliberations?anneeId={inscription.AnneeAcadId}&filiereId={inscription.FiliereId}&niveauId={inscription.NiveauId}");
+        Assert.Contains("AGBEKO", page);
+        Assert.Contains("<strong>Admis</strong>", page);
+
+        Assert.Contains("AGBEKO", await admin.GetStringAsync($"/Deliberations/Exporter?anneeId={inscription.AnneeAcadId}"));
+
+        var pdf = await admin.EnvoyerAsync("/Documents", "/Documents",
+            ("Type", TypeDocument.ProcesVerbal.ToString()), ("AnneeAcadId", inscription.AnneeAcadId.ToString()),
+            ("FiliereId", inscription.FiliereId.ToString()), ("NiveauId", inscription.NiveauId.ToString()),
+            ("Signataire", "Le président du jury"), ("Lieu", "Lomé"), ("DateDocument", DateTime.Today.ToString("yyyy-MM-dd")));
+        Assert.Equal("application/pdf", pdf.Content.Headers.ContentType!.MediaType);
     }
 
     [MySqlFact]
@@ -472,6 +589,101 @@ public class ParcoursTests
         Assert.Equal("nosniff", reponse.Headers.GetValues("X-Content-Type-Options").Single());
         Assert.Equal("DENY", reponse.Headers.GetValues("X-Frame-Options").Single());
         Assert.Contains("script-src 'self'", reponse.Headers.GetValues("Content-Security-Policy").Single());
+    }
+
+    [MySqlFact]
+    public async Task Une_panne_affiche_une_page_generique_et_le_detail_part_dans_les_logs()
+    {
+        using var app = new Application();
+        var reponse = await app.Navigateur().GetAsync("/Panne");
+
+        Assert.Equal(HttpStatusCode.InternalServerError, reponse.StatusCode);
+        var page = await reponse.TexteAsync();
+        Assert.Contains("Une erreur est survenue", page);
+        Assert.DoesNotContain("detail-interne-secret", page);
+        Assert.DoesNotContain("PanneController", page);
+        Assert.Contains(app.Logs, l => l.StartsWith("Error") && l.Contains("detail-interne-secret"));
+    }
+
+    [MySqlFact]
+    public async Task Un_formulaire_sans_jeton_anti_CSRF_est_refuse()
+    {
+        using var app = new Application();
+        var admin = await app.AdminAsync();
+
+        var reponse = await admin.PostAsync("/Filieres/Create", new FormUrlEncodedContent(new Dictionary<string, string> { ["Code"] = "CSRF", ["Nom"] = "Forgé" }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, reponse.StatusCode);
+        Assert.Contains("Demande invalide", await reponse.TexteAsync());
+        Assert.False(await app.AvecBaseAsync(db => db.Filieres.AnyAsync(f => f.Code == "CSRF")));
+    }
+
+    [MySqlFact]
+    public async Task Les_evenements_de_securite_partent_dans_les_logs_sans_mot_de_passe()
+    {
+        using var app = new Application();
+        var admin = await app.AdminAsync();
+        var lecteur = await app.ProfilAsync(admin, Roles.Consultation);
+        await lecteur.GetAsync("/Comptes");
+
+        // Une saisie avec un retour à la ligne ne doit pas pouvoir fabriquer une fausse ligne de log
+        await app.Navigateur().ConnecterAsync("pirate@test.local\nFAUX", "mot-de-passe-Essai-1");
+
+        Assert.Contains(app.Logs, l => l.StartsWith("Warning") && l.Contains("Accès refusé") && l.Contains("Comptes/Index"));
+        Assert.Contains(app.Logs, l => l.StartsWith("Warning") && l.Contains("Connexion refusée") && l.Contains("pirate@test.localfaux"));
+        Assert.Contains(app.Logs, l => l.Contains($"Connexion de {Application.AdminEmail}"));
+        Assert.DoesNotContain(app.Logs, l => l.Contains("mot-de-passe-Essai-1") || l.Contains("definitif-Test-456"));
+    }
+
+    [MySqlFact]
+    public async Task Le_verrouillage_et_la_deconnexion_sont_journalises()
+    {
+        using var app = new Application();
+        var client = app.Navigateur();
+        for (var i = 0; i < 5; i++)
+            await client.ConnecterAsync(Application.AdminEmail, "mauvais-mot-de-passe-1");
+
+        var admin = await app.AvecBaseAsync(db => db.JournalAudit.AsNoTracking().Where(j => j.Action == "Connexion refusée").ToListAsync());
+        Assert.Equal(5, admin.Count);
+        Assert.Single(admin, j => j.Details?.Contains("verrouillé") == true);
+        Assert.Contains(app.Logs, l => l.Contains("Compte verrouillé"));
+
+        await app.AvecBaseAsync(async db =>
+        {
+            await db.Comptes.ExecuteUpdateAsync(c => c.SetProperty(x => x.VerrouilleJusquA, (DateTime?)null));
+            return true;
+        });
+        var session = await app.AdminAsync();
+        var deconnexion = await session.EnvoyerAsync("/Documents", "/Connexion/Deconnexion");
+        Assert.Equal(HttpStatusCode.Redirect, deconnexion.StatusCode);
+        Assert.True(await app.AvecBaseAsync(db => db.JournalAudit.AnyAsync(j => j.Action == "Déconnexion" && j.Auteur == Application.AdminEmail)));
+    }
+
+    [MySqlFact]
+    public async Task Un_administrateur_recupere_son_compte_en_ligne_de_commande()
+    {
+        using var app = new Application();
+        var admin = await app.AdminAsync();
+
+        Assert.Null(await Demarrage.ReinitialiserMotDePasseAsync(app.Services, "inconnu@test.local"));
+        var provisoire = await Demarrage.ReinitialiserMotDePasseAsync(app.Services, Application.AdminEmail.ToUpperInvariant());
+        Assert.NotNull(provisoire);
+
+        // L'ancienne session et l'ancien mot de passe ne valent plus rien ; le provisoire doit être changé
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.GetAsync("/Etudiants")).StatusCode);
+        var client = app.Navigateur();
+        Assert.Equal(HttpStatusCode.OK, (await client.ConnecterAsync(Application.AdminEmail, "definitif-Test-456")).StatusCode);
+        var connexion = await client.ConnecterAsync(Application.AdminEmail, provisoire!);
+        Assert.Contains("MotDePasse", connexion.Headers.Location!.ToString());
+    }
+
+    [MySqlFact]
+    public async Task Un_type_de_document_inconnu_renvoie_404()
+    {
+        using var app = new Application();
+        var admin = await app.AdminAsync();
+
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync("/Documents/Telecharger?type=99&id=1")).StatusCode);
     }
 
     [MySqlFact]

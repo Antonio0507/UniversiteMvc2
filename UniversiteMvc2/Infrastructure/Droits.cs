@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Razor.TagHelpers;
@@ -42,7 +43,7 @@ public static class Droits
 }
 
 // Appliqué à toutes les actions (Program.cs) ; l'authentification est déjà exigée par la politique par défaut
-public class DroitsFilter : IAuthorizationFilter
+public class DroitsFilter(ILogger<DroitsFilter> journal) : IAuthorizationFilter
 {
     public void OnAuthorization(AuthorizationFilterContext context)
     {
@@ -61,7 +62,11 @@ public class DroitsFilter : IAuthorizationFilter
 
         var lecture = HttpMethods.IsGet(context.HttpContext.Request.Method) || HttpMethods.IsHead(context.HttpContext.Request.Method);
         if (!Droits.Autorise(utilisateur, controleur, action, lecture))
+        {
+            journal.LogWarning("Accès refusé : {Identifiant} sur {Methode} {Controleur}/{Action}",
+                utilisateur.FindFirstValue(ClaimTypes.Email), context.HttpContext.Request.Method, controleur, action);
             context.Result = new ForbidResult();
+        }
     }
 }
 
@@ -105,6 +110,18 @@ public static class MotsDePasse
         if (!motDePasse.Any(char.IsLetter) || !motDePasse.Any(char.IsDigit))
             return "Le mot de passe doit contenir au moins une lettre et un chiffre.";
         return null;
+    }
+
+    // Pose un mot de passe provisoire, débloque le compte et ferme ses sessions ; renvoie le provisoire, à transmettre une seule fois
+    public static string Reinitialiser(Compte compte)
+    {
+        var provisoire = Generer();
+        compte.MotDePasseHash = new PasswordHasher<Compte>().HashPassword(compte, provisoire);
+        compte.DoitChangerMotDePasse = true;
+        compte.EchecsConnexion = 0;
+        compte.VerrouilleJusquA = null;
+        compte.Jeton = Guid.NewGuid().ToString();
+        return provisoire;
     }
 
     // Mot de passe provisoire, sans caractères ambigus (l, 1, O, 0) car il est souvent recopié ou dicté

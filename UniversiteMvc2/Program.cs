@@ -116,6 +116,16 @@ var app = builder.Build();
 
 if (derriereProxy) app.UseForwardedHeaders();
 
+// Mot de passe administrateur perdu : dotnet UniversiteMvc2.dll reinitialiser-mot-de-passe <e-mail>
+// Affiché sur la console uniquement, pour qu'il n'entre pas dans les logs. Le serveur web ne démarre pas.
+if (args is [Demarrage.CommandeReinitialisation, var email])
+{
+    var provisoire = await Demarrage.ReinitialiserMotDePasseAsync(app.Services, email);
+    Console.WriteLine(provisoire == null ? $"Aucun compte pour {email}." : $"Mot de passe provisoire de {email} : {provisoire}");
+    Environment.ExitCode = provisoire == null ? 1 : 0;
+    return;
+}
+
 // Schéma de la base (migrations), référentiel minimal et premier administrateur au démarrage
 await Demarrage.PreparerAsync(app.Services);
 

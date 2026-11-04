@@ -22,8 +22,12 @@ public class ConnexionController : AppController
     private static readonly string HashFactice = new PasswordHasher<Compte>().HashPassword(new Compte(), Guid.NewGuid().ToString());
 
     private readonly PasswordHasher<Compte> _hacheur = new();
+    private readonly ILogger<ConnexionController> _journal;
 
-    public ConnexionController(ApplicationDbContext context) : base(context) { }
+    public ConnexionController(ApplicationDbContext context, ILogger<ConnexionController> journal) : base(context)
+    {
+        _journal = journal;
+    }
 
     [AllowAnonymous]
     [HttpGet]
@@ -47,9 +51,11 @@ public class ConnexionController : AppController
         var identifiant = email?.Trim().ToLowerInvariant() ?? "";
         var compte = await _context.Comptes.FirstOrDefaultAsync(c => c.Email == identifiant);
         var maintenant = DateTime.UtcNow;
+        var ip = HttpContext.Connection.RemoteIpAddress;
 
         if (compte?.VerrouilleJusquA > maintenant)
         {
+            _journal.LogWarning("Connexion refusée : compte verrouillé {Identifiant} depuis {Ip}", compte.Email, ip);
             ModelState.AddModelError(string.Empty, $"Compte temporairement verrouillé après {EchecsMaximum} échecs. Réessayez dans quelques minutes.");
             return View();
         }
@@ -58,6 +64,7 @@ public class ConnexionController : AppController
 
         if (compte == null || !compte.Actif || verification == PasswordVerificationResult.Failed)
         {
+            string? details = null;
             if (compte != null)
             {
                 compte.EchecsConnexion++;
@@ -65,10 +72,14 @@ public class ConnexionController : AppController
                 {
                     compte.VerrouilleJusquA = maintenant.Add(DureeVerrouillage);
                     compte.EchecsConnexion = 0;
+                    details = $"Compte verrouillé {DureeVerrouillage.TotalMinutes} minutes";
+                    _journal.LogWarning("Compte verrouillé après {Echecs} échecs : {Identifiant} depuis {Ip}", EchecsMaximum, compte.Email, ip);
                 }
             }
-            _context.JournalAudit.Add(new JournalAudit { Auteur = Tronquer(identifiant, 100), Action = "Connexion refusée", Entite = nameof(Compte), EntiteId = compte?.Id });
+            _context.JournalAudit.Add(new JournalAudit { Auteur = Tronquer(identifiant, 100), Action = "Connexion refusée", Entite = nameof(Compte), EntiteId = compte?.Id, Details = details });
             await _context.SaveChangesAsync();
+
+            _journal.LogWarning("Connexion refusée pour {Identifiant} depuis {Ip}", PourJournal(identifiant), ip);
 
             ModelState.AddModelError(string.Empty, refus);
             return View();
@@ -83,6 +94,7 @@ public class ConnexionController : AppController
         await _context.SaveChangesAsync();
 
         await OuvrirSessionAsync(compte);
+        _journal.LogInformation("Connexion de {Identifiant} ({Role}) depuis {Ip}", compte.Email, compte.Role, ip);
 
         if (compte.DoitChangerMotDePasse) return RedirectToAction(nameof(MotDePasse));
         return !string.IsNullOrEmpty(retour) && Url.IsLocalUrl(retour) ? LocalRedirect(retour) : RedirectToAction("Index", "Home");
@@ -92,7 +104,12 @@ public class ConnexionController : AppController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Deconnexion()
     {
+        var email = User.FindFirstValue(ClaimTypes.Email) ?? "";
+        _context.JournalAudit.Add(new JournalAudit { Auteur = Tronquer(email, 100), Action = "Déconnexion", Entite = nameof(Compte), EntiteId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null });
+        await _context.SaveChangesAsync();
+
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        _journal.LogInformation("Déconnexion de {Identifiant}", email);
         return RedirectToAction(nameof(Index));
     }
 
@@ -124,6 +141,7 @@ public class ConnexionController : AppController
         await _context.SaveChangesAsync();
 
         await OuvrirSessionAsync(compte);
+        _journal.LogInformation("Mot de passe modifié par {Identifiant}", compte.Email);
         Succes("Mot de passe modifié.");
         return RedirectToAction("Index", "Home");
     }
@@ -145,4 +163,7 @@ public class ConnexionController : AppController
     }
 
     private static string Tronquer(string texte, int longueur) => texte.Length <= longueur ? texte : texte[..longueur];
+
+    // Saisie libre : sans retours à la ligne, elle ne peut pas fabriquer de fausses lignes dans les logs
+    private static string PourJournal(string texte) => Tronquer(new string(texte.Where(c => !char.IsControl(c)).ToArray()), 100);
 }

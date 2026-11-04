@@ -33,4 +33,6 @@ public class Cours
     [ForeignKey(nameof(EnseignantId))]
     [Display(Name = "Enseignant")]
     public Enseignant? Enseignant { get; set; }
+
+    public ICollection<Seance> Seances { get; set; } = new List<Seance>();
 }

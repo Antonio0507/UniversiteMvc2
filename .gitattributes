@@ -1,0 +1,2 @@
+# Le script de sauvegarde s'exécute sous Linux : un retour chariot Windows le casserait
+*.sh text eol=lf

@@ -62,11 +62,14 @@ public class HomeController : AppController
         return View(modele);
     }
 
-    // Page affichée pour les codes d'erreur HTTP (404, 403, 429…)
+    // Page affichée pour les codes d'erreur HTTP (404, 403, 429…).
+    // Après un POST refusé, elle est rejouée en POST : le jeton anti-CSRF ne doit pas y être revérifié, sinon elle reste vide.
     [AllowAnonymous]
-    public IActionResult Introuvable(int code = 404) => View(code);
+    [IgnoreAntiforgeryToken]
+    public IActionResult Introuvable([FromQuery] int code = 404) => View(code);
 
     [AllowAnonymous]
+    [IgnoreAntiforgeryToken]
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()
     {

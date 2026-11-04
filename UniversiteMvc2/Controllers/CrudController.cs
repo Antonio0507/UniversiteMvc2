@@ -36,6 +36,9 @@ public abstract class CrudController<T> : AppController where T : class, new()
 
     protected virtual IQueryable<T> Trier(IQueryable<T> requete) => requete.OrderBy(e => EF.Property<int>(e, "Id"));
 
+    // Données supplémentaires à charger pour la liste et la fiche (références de références…)
+    protected virtual IQueryable<T> Inclure(IQueryable<T> requete) => requete;
+
     // Listes déroulantes des clés étrangères ; une liste déjà placée dans ViewData est conservée
     protected virtual async Task RemplirListesAsync(T entite)
     {
@@ -55,7 +58,7 @@ public abstract class CrudController<T> : AppController where T : class, new()
     [HttpGet]
     public virtual async Task<IActionResult> Index(string? q, int page = 1)
     {
-        var requete = AvecReferences(_context.Set<T>().AsNoTracking());
+        var requete = Inclure(AvecReferences(_context.Set<T>().AsNoTracking()));
         foreach (var collection in Description.Collections) requete = requete.Include(collection.Nom);
 
         if (!string.IsNullOrWhiteSpace(q))
@@ -73,7 +76,7 @@ public abstract class CrudController<T> : AppController where T : class, new()
     {
         if (id == null) return NotFound();
 
-        var requete = AvecReferences(_context.Set<T>().AsNoTrackingWithIdentityResolution());
+        var requete = Inclure(AvecReferences(_context.Set<T>().AsNoTrackingWithIdentityResolution()));
         foreach (var collection in Description.Collections)
         {
             requete = requete.Include(collection.Nom);

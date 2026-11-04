@@ -1,0 +1,57 @@
+@model Seance
+@{
+    ViewData["Title"] = $"Séance — {Model.Cours?.Intitule}";
+    var absences = Model.Absences.OrderBy(a => a.Inscription?.Etudiant?.Nom).ToList();
+}
+
+<header class="entete">
+    <div>
+        <p class="entete__sur">@Model.Type · <span class="mono">@Model.Cours?.UE?.Code</span></p>
+        <h1>@Model.Cours?.Intitule</h1>
+    </div>
+    <div class="entete__actions">
+        <a asp-controller="Absences" asp-action="Appel" asp-route-seanceId="@Model.Id" class="btn btn--plein">Feuille d'appel</a>
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn">Modifier</a>
+        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn--danger">Supprimer</a>
+    </div>
+</header>
+
+<dl class="fiche">
+    <div><dt>Date</dt><dd>@Formats.Jour(Model.Date) @Model.Date.Year</dd></div>
+    <div><dt>Horaire</dt><dd class="mono">@Formats.Heure(Model.HeureDebut)–@Formats.Heure(Model.HeureFin) (@Formats.Heures(Model.Duree))</dd></div>
+    <div><dt>Promotion</dt><dd class="mono">@Model.Cours?.UE?.Filiere?.Code · @Model.Cours?.UE?.Niveau?.Code</dd></div>
+    <div><dt>Enseignant</dt><dd>@(Model.Cours?.Enseignant?.NomComplet ?? "—")</dd></div>
+    <div><dt>Salle</dt><dd>@(Model.Salle == null ? "—" : $"{Model.Salle} · {Formats.Pluriel(Model.Salle.Capacite, "place")}")</dd></div>
+    <div><dt>Absences</dt><dd class="grand">@absences.Count</dd></div>
+</dl>
+
+<section class="bloc">
+    <div class="bloc__tete">
+        <h2 class="bloc__titre">Absents <span class="bloc__compte">@absences.Count</span></h2>
+    </div>
+    @if (absences.Count == 0)
+    {
+        <p class="vide">Aucune absence relevée. <a asp-controller="Absences" asp-action="Appel" asp-route-seanceId="@Model.Id">Faire l'appel</a></p>
+    }
+    else
+    {
+        <table class="registre">
+            <thead>
+                <tr><th>Matricule</th><th>Étudiant</th><th>Justifiée</th><th>Motif</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var a in absences)
+                {
+                    <tr>
+                        <td class="mono">@a.Inscription?.Etudiant?.Matricule</td>
+                        <td><a asp-controller="Inscriptions" asp-action="Details" asp-route-id="@a.InscriptionId" class="lien-fort">@a.Inscription?.Etudiant?.NomComplet</a></td>
+                        <td>@(a.Justifiee ? "Oui" : "Non")</td>
+                        <td>@(a.Motif ?? "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+<a class="retour" asp-action="Index" asp-route-semaine="@Model.Date.ToString("yyyy-MM-dd")">← Emploi du temps de la semaine</a>

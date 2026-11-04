@@ -480,3 +480,6 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Ancienne base SQLite locale : l'application utilise MySQL/MariaDB
+*.db

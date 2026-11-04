@@ -10,7 +10,26 @@ namespace UniversiteMvc2.Infrastructure;
 // Préparation de la base au lancement : schéma, référentiel minimal, premier administrateur, démonstration (facultative)
 public static class Demarrage
 {
+    public const string CommandeReinitialisation = "reinitialiser-mot-de-passe";
+
     private const string MigrationInitiale = "20261030101445_Initial";
+
+    // Dernier recours en ligne de commande, si plus aucun administrateur ne peut se connecter.
+    // Réservé à qui a accès au serveur ; tracé dans le journal d'audit. Renvoie null si le compte n'existe pas.
+    public static async Task<string?> ReinitialiserMotDePasseAsync(IServiceProvider services, string email)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var identifiant = email.Trim().ToLowerInvariant();
+        var compte = await db.Comptes.FirstOrDefaultAsync(c => c.Email == identifiant);
+        if (compte == null) return null;
+
+        var provisoire = MotsDePasse.Reinitialiser(compte);
+        compte.Actif = true;
+        await db.SaveChangesAsync();
+        return provisoire;
+    }
 
     public static async Task PreparerAsync(IServiceProvider services)
     {
@@ -119,11 +138,24 @@ public static class DonneesDemo
         var inscription1 = new Inscription { Etudiant = agbeko, Filiere = info, Niveau = l1, AnneeAcad = courante, DateInscription = courante.DateDebut.AddDays(4), Statut = Inscription.Validee };
         var inscription2 = new Inscription { Etudiant = dossou, Filiere = gestion, Niveau = l1, AnneeAcad = courante, DateInscription = courante.DateDebut.AddDays(7), Statut = Inscription.EnAttente };
 
-        db.AddRange(droit, algo, bdd, compta, koffi, mensah, inscription1, inscription2);
+        var coursAlgo = new Cours { Intitule = "Algorithmique - CM", VolumeHoraire = 30, UE = algo, Enseignant = koffi };
+        var coursSql = new Cours { Intitule = "SQL et modélisation", VolumeHoraire = 40, UE = bdd, Enseignant = koffi };
+        var amphi = new Salle { Code = "AMPHI-A", Nom = "Amphithéâtre A", Type = "Amphithéâtre", Capacite = 300 };
+        var labo = new Salle { Code = "B12", Nom = "Salle informatique B12", Type = "Salle informatique", Capacite = 30 };
+
+        // Emploi du temps de la semaine en cours, ou de la deuxième semaine de l'année hors période de cours
+        static DateTime Lundi(DateTime jour) => jour.AddDays(-(((int)jour.DayOfWeek + 6) % 7));
+        var lundi = Lundi(DateTime.Today);
+        if (lundi < courante.DateDebut || lundi.AddDays(5) > courante.DateFin) lundi = Lundi(courante.DateDebut).AddDays(7);
+        var seanceAlgo = new Seance { Cours = coursAlgo, Salle = amphi, Date = lundi, HeureDebut = new(8, 0, 0), HeureFin = new(10, 0, 0) };
+
+        db.AddRange(droit, algo, bdd, compta, koffi, mensah, inscription1, inscription2, coursAlgo, coursSql, amphi, labo, seanceAlgo);
         db.AddRange(
-            new Cours { Intitule = "Algorithmique - CM", VolumeHoraire = 30, UE = algo, Enseignant = koffi },
-            new Cours { Intitule = "SQL et modélisation", VolumeHoraire = 40, UE = bdd, Enseignant = koffi },
             new Cours { Intitule = "Comptabilité - TD", VolumeHoraire = 20, UE = compta, Enseignant = mensah },
+            new Seance { Cours = coursSql, Salle = labo, Type = "Travaux pratiques", Date = lundi.AddDays(2), HeureDebut = new(10, 0, 0), HeureFin = new(12, 30, 0) },
+            new Seance { Cours = coursAlgo, Salle = amphi, Type = Seance.Examen, Date = lundi.AddDays(4), HeureDebut = new(14, 0, 0), HeureFin = new(16, 0, 0) },
+            new Absence { Seance = seanceAlgo, Inscription = inscription1, Justifiee = true, Motif = "Certificat médical" },
+            new Aide { Inscription = inscription2, Type = "Bourse sociale", Montant = 100000m, Motif = "Commission des bourses" },
             new Tarif { AnneeAcad = courante, Filiere = info, Niveau = l1, Montant = 350000m },
             new Tarif { AnneeAcad = courante, Filiere = gestion, Niveau = l1, Montant = 300000m },
             new Paiement { Inscription = inscription1, Montant = 150000m, DatePaiement = inscription1.DateInscription, Mode = "Mobile Money" },

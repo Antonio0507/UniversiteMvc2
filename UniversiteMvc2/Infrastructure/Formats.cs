@@ -19,6 +19,12 @@ public static class Formats
 
     public static string DateLongue(DateTime date) => date.ToString("d MMMM yyyy", Fr);
 
+    public static string Jour(DateTime date) => Libelles.Majuscule(date.ToString("dddd d MMMM", Fr));
+
+    public static string Heure(TimeSpan heure) => heure.ToString(@"hh\hmm", Fr);
+
+    public static string Heures(decimal heures) => $"{heures.ToString("0.#", Fr)} h";
+
     public static string NumeroRecu(int paiementId) => $"R-{paiementId:000000}";
 
     public static int Age(DateTime naissance)

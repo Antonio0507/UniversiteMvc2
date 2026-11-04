@@ -1,7 +1,8 @@
 # Gestion universitaire
 
 Application web de scolarité (ASP.NET Core MVC, .NET 10, MySQL/MariaDB) : étudiants, inscriptions, notes et relevés,
-paiements, tarifs et impayés, enseignement, documents PDF, comptes et journal d'audit.
+délibérations, assiduité, paiements, tarifs, bourses et impayés, enseignement, emploi du temps et salles,
+documents PDF, comptes et journal d'audit.
 
 Une installation sert un seul établissement, avec sa propre base.
 
@@ -18,18 +19,33 @@ docker compose logs application | grep "Premier administrateur"
 Le journal affiche une seule fois le mot de passe provisoire de l'administrateur, à changer à la première connexion.
 Pour le fixer soi-même, définir `Admin__MotDePasse` dans l'environnement du service `application`.
 
-Ensuite, dans l'application : années académiques, filières, UE, tarifs, puis comptes du personnel.
+Ensuite, dans l'application : années académiques, filières, UE, salles, tarifs, puis comptes du personnel.
 
 ## Profils
 
 | Profil | Écrit dans | Lit |
 | --- | --- | --- |
 | Administrateur | tout, comptes inclus | tout, journal d'audit inclus |
-| Scolarité | étudiants, inscriptions, notes, enseignement, années | tout sauf administration |
-| Comptabilité | paiements, tarifs | tout sauf administration |
+| Scolarité | étudiants, inscriptions, notes, délibérations, assiduité, enseignement, emploi du temps, salles, années | tout sauf administration |
+| Comptabilité | paiements, tarifs, bourses et exonérations | tout sauf administration |
 | Consultation | rien | tout sauf administration, sans export CSV |
 
 Tout le monde peut générer les documents PDF. Pour un mot de passe oublié, un administrateur le réinitialise depuis **Comptes**.
+
+Si plus aucun administrateur ne peut se connecter, depuis le serveur :
+`docker compose exec application dotnet UniversiteMvc2.dll reinitialiser-mot-de-passe admin@exemple.tg`
+(en développement : `dotnet run -- reinitialiser-mot-de-passe admin@exemple.tg`). Le mot de passe provisoire s'affiche sur la console.
+
+## Règles de gestion
+
+- **Délibérations** : une UE est validée à partir de 10/20 (meilleure des deux sessions). Toutes les UE validées : *Admis* ;
+  sinon une moyenne pondérée d'au moins 10 : *Admis par compensation* ; sinon *Ajourné*. Une UE sans note : *Incomplet*.
+  Les ex aequo partagent le même rang. Le procès-verbal PDF se génère par promotion (année, filière, niveau).
+- **Bourses et exonérations** : déduites du tarif pour le reste à payer, les impayés, les reçus et les relevés ; leur total ne peut pas dépasser le tarif.
+- **Emploi du temps** : une salle, un enseignant ou une promotion ne peuvent pas avoir deux séances qui se chevauchent.
+  Un cours ou une UE qui a des séances programmées ne peut plus être supprimé.
+- **Assiduité** : l'appel se fait depuis une séance ; les étudiants attendus sont les inscriptions validées de l'année
+  qui contient la date de la séance, dans la filière et le niveau de l'UE.
 
 ## Exploitation
 
@@ -37,7 +53,29 @@ Tout le monde peut générer les documents PDF. Pour un mot de passe oublié, un
 - **Sauvegarde** : planifier `deploy/sauvegarde.sh` (voir l'en-tête du script) et copier `sauvegardes/` hors du serveur.
 - **Restauration** : `gunzip -c sauvegardes/FICHIER.sql.gz | docker compose exec -T base sh -c 'exec mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"'`
 - **Supervision** : `GET /sante` répond 200 si l'application et la base fonctionnent, 503 sinon.
+- **Logs** : `docker compose logs application`. Connexions, refus d'accès et pannes y figurent avec l'heure UTC et l'adresse IP ; la « Référence » affichée sur une page d'erreur 500 s'y retrouve. Le journal d'audit, lui, se consulte dans l'application.
 - **Volume `cles`** : à conserver. Le perdre déconnecte tout le monde, sans perte de données.
+
+## Tester sans Docker
+
+Prérequis : le [SDK .NET 10](https://dotnet.microsoft.com/download) et un serveur MySQL ou MariaDB.
+Sous Windows, le plus simple est XAMPP (ou WAMP, Laragon), qui installe MariaDB et phpMyAdmin.
+
+1. Démarrer MySQL depuis le panneau XAMPP (port 3306, utilisateur `root` sans mot de passe par défaut).
+2. Dans phpMyAdmin, créer une base vide `gestion_universitaire` (interclassement `utf8mb4_general_ci`).
+3. Dans PowerShell, depuis le dossier `UniversiteMvc2` :
+   ```powershell
+   $env:ConnectionStrings__DefaultConnection = "Server=localhost;Port=3306;Database=gestion_universitaire;User=root;Password=;"
+   $env:Admin__MotDePasse = "Test-admin-2026"
+   dotnet run
+   ```
+4. Ouvrir http://localhost:5267 et se connecter avec `admin@universite.local` / `Test-admin-2026`
+   (le mot de passe est à changer à la première connexion).
+
+Les tables sont créées au premier lancement, et une base vide reçoit le jeu d'essai fictif : tout se teste immédiatement.
+La chaîne de connexion de `appsettings.json` vise le port 3307 du conteneur Docker : sans la variable ci-dessus, la base est introuvable.
+
+Pour les tests automatisés, définir `TEST_MYSQL` vers le même serveur (`Server=127.0.0.1;Port=3306;User=root;Password=;`), puis `dotnet test` (voir [Tests](#tests)).
 
 ## Développer
 

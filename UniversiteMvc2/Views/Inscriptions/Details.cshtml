@@ -6,6 +6,9 @@
     var solde = (Solde)ViewData["solde"]!;
     var ues = (List<UE>)ViewData["ues"]!;
     var bilan = (Bilan)ViewData["bilan"]!;
+    var tarif = ViewData["tarif"] as decimal?;
+    var aides = Model.Aides.OrderBy(a => a.Id).ToList();
+    var absences = Model.Absences.OrderByDescending(a => a.Seance?.Date).ThenByDescending(a => a.Seance?.HeureDebut).ToList();
 }
 
 <header class="entete">
@@ -31,7 +34,11 @@
     <div><dt>Filière</dt><dd><a asp-controller="Filieres" asp-action="Details" asp-route-id="@Model.FiliereId">@Model.Filiere?.Nom</a></dd></div>
     <div><dt>Niveau</dt><dd>@Model.Niveau?.Libelle</dd></div>
     <div><dt>Inscrit le</dt><dd>@Formats.DateLongue(Model.DateInscription)</dd></div>
-    <div><dt>Frais de scolarité</dt><dd>@(solde.Du == null ? "Aucun tarif" : Formats.Montant(solde.Du.Value))</dd></div>
+    <div><dt>Frais de scolarité</dt><dd>@(tarif == null ? "Aucun tarif" : Formats.Montant(tarif.Value))</dd></div>
+    @if (aides.Count > 0)
+    {
+        <div><dt>Bourses et exonérations</dt><dd>− @Formats.Montant(aides.Sum(a => a.Montant))</dd></div>
+    }
     <div><dt>Versé</dt><dd>@Formats.Montant(solde.Verse)</dd></div>
     <div><dt>Reste à payer</dt><dd class="grand">@(solde.Reste == null ? "—" : Formats.Montant(solde.Reste.Value))</dd></div>
 </dl>
@@ -97,7 +104,7 @@
 <section class="bloc">
     <div class="bloc__tete">
         <h2 class="bloc__titre">Notes <span class="bloc__compte">@Model.Notes.Count</span></h2>
-        <span class="etiquette">Moyenne @Formats.Note(bilan.Moyenne) · @bilan.CreditsValides / @bilan.CreditsTotal crédits</span>
+        <span class="etiquette">Moyenne @Formats.Note(bilan.Moyenne) · @bilan.CreditsValides / @bilan.CreditsTotal crédits · @bilan.Decision</span>
     </div>
     @if (ues.Count == 0)
     {
@@ -119,6 +126,68 @@
                         <td class="num">@Formats.Note(note?.Valeur)</td>
                         <td class="num">@Formats.Note(note?.Rattrapage)</td>
                         <td class="num">@Formats.Note(note?.Retenue)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+<section class="bloc">
+    <div class="bloc__tete">
+        <h2 class="bloc__titre">Bourses et exonérations <span class="bloc__compte">@aides.Count</span></h2>
+        <a asp-controller="Aides" asp-action="Create" asp-route-inscriptionId="@Model.Id" class="btn btn--lien">Accorder une aide</a>
+    </div>
+    @if (aides.Count == 0)
+    {
+        <p class="vide">Aucune aide accordée.</p>
+    }
+    else
+    {
+        <table class="registre">
+            <thead>
+                <tr><th>Type</th><th>Motif</th><th class="num">Montant</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var a in aides)
+                {
+                    <tr>
+                        <td><a asp-controller="Aides" asp-action="Details" asp-route-id="@a.Id">@a.Type</a></td>
+                        <td>@(a.Motif ?? "—")</td>
+                        <td class="num">@Formats.Montant(a.Montant)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+<section class="bloc">
+    <div class="bloc__tete">
+        <h2 class="bloc__titre">Absences <span class="bloc__compte">@absences.Count</span></h2>
+        @if (absences.Count > 0)
+        {
+            <span class="etiquette">@Formats.Heures(absences.Sum(a => a.Seance!.Duree)) · dont @Formats.Heures(absences.Where(a => !a.Justifiee).Sum(a => a.Seance!.Duree)) non justifiées</span>
+        }
+    </div>
+    @if (absences.Count == 0)
+    {
+        <p class="vide">Aucune absence relevée.</p>
+    }
+    else
+    {
+        <table class="registre">
+            <thead>
+                <tr><th>Date</th><th>Séance</th><th>Justifiée</th><th>Motif</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var a in absences)
+                {
+                    <tr>
+                        <td>@Formats.Date(a.Seance!.Date) <span class="leger mono">@Formats.Heure(a.Seance.HeureDebut)</span></td>
+                        <td><a asp-controller="Absences" asp-action="Appel" asp-route-seanceId="@a.SeanceId">@a.Seance.Cours?.Intitule</a></td>
+                        <td>@(a.Justifiee ? "Oui" : "Non")</td>
+                        <td>@(a.Motif ?? "—")</td>
                     </tr>
                 }
             </tbody>

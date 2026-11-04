@@ -1,0 +1,94 @@
+@model List<Seance>
+@{
+    ViewData["Title"] = "Emploi du temps";
+    var lundi = (DateTime)ViewData["lundi"]!;
+    var cetteSemaine = lundi <= DateTime.Today && DateTime.Today < lundi.AddDays(7);
+    IEnumerable<SelectListItem> Liste(string nom) => (IEnumerable<SelectListItem>)ViewData[nom]!;
+    string Semaine(DateTime jour) => jour.ToString("yyyy-MM-dd");
+    // Les filtres suivent la navigation d'une semaine à l'autre
+    var filtres = Context.Request.Query
+        .Where(p => p.Key != "semaine")
+        .ToDictionary(p => p.Key, p => p.Value.ToString());
+    var filtre = filtres.Values.Any(v => !string.IsNullOrEmpty(v));
+    var jours = Model.GroupBy(s => s.Date.Date).ToList();
+}
+
+<header class="entete">
+    <div>
+        <h1>Emploi du temps</h1>
+        <p class="entete__resume">Semaine du @Formats.DateLongue(lundi) · @Formats.Pluriel(Model.Count, "séance") · @Formats.Heures(Model.Sum(s => s.Duree)) · @Formats.Pluriel(Model.Count(s => s.Type == Seance.Examen), "examen")</p>
+    </div>
+    <div class="entete__actions">
+        <a asp-action="Index" asp-all-route-data="filtres" asp-route-semaine="@Semaine(lundi.AddDays(-7))" class="btn">← Semaine précédente</a>
+        <a asp-action="Index" asp-all-route-data="filtres" class="btn btn--lien">Cette semaine</a>
+        <a asp-action="Index" asp-all-route-data="filtres" asp-route-semaine="@Semaine(lundi.AddDays(7))" class="btn">Semaine suivante →</a>
+        <a asp-action="Create" asp-route-date="@Semaine(cetteSemaine ? DateTime.Today : lundi)" class="btn btn--plein">Nouvelle séance</a>
+    </div>
+</header>
+
+<form method="get" class="filtres">
+    <input type="hidden" name="semaine" value="@Semaine(lundi)" />
+    <label class="sr" for="filiereId">Filière</label>
+    <select id="filiereId" name="filiereId" asp-items='Liste("FiliereId")'><option value="">Toutes les filières</option></select>
+    <label class="sr" for="niveauId">Niveau</label>
+    <select id="niveauId" name="niveauId" asp-items='Liste("NiveauId")'><option value="">Tous les niveaux</option></select>
+    <label class="sr" for="enseignantId">Enseignant</label>
+    <select id="enseignantId" name="enseignantId" asp-items='Liste("EnseignantId")'><option value="">Tous les enseignants</option></select>
+    <label class="sr" for="salleId">Salle</label>
+    <select id="salleId" name="salleId" asp-items='Liste("SalleId")'><option value="">Toutes les salles</option></select>
+    <label class="sr" for="type">Type</label>
+    <select id="type" name="type" asp-items='Liste("Type")'><option value="">Tous les types</option></select>
+    <button class="btn" type="submit">Filtrer</button>
+    @if (filtre)
+    {
+        <a asp-action="Index" asp-route-semaine="@Semaine(lundi)" class="btn btn--lien">Effacer</a>
+    }
+</form>
+
+@if (Model.Count == 0)
+{
+    <p class="vide">Aucune séance cette semaine@(filtre ? " pour ces critères" : ""). <a asp-action="Create" asp-route-date="@Semaine(lundi)">Programmer une séance</a></p>
+}
+else
+{
+    @foreach (var jour in jours)
+    {
+        <section class="bloc">
+            <div class="bloc__tete">
+                <h2 class="bloc__titre">@Formats.Jour(jour.Key) <span class="bloc__compte">@jour.Count()</span></h2>
+            </div>
+            <div class="defilement">
+                <table class="registre">
+                    <thead>
+                        <tr>
+                            <th>Horaire</th>
+                            <th>Cours</th>
+                            <th>Type</th>
+                            <th class="masquer-etroit">Promotion</th>
+                            <th>Enseignant</th>
+                            <th>Salle</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in jour)
+                        {
+                            <tr>
+                                <td class="mono">@Formats.Heure(s.HeureDebut)–@Formats.Heure(s.HeureFin)</td>
+                                <td><a asp-action="Details" asp-route-id="@s.Id" class="lien-fort">@s.Cours?.Intitule</a> <span class="leger mono">@s.Cours?.UE?.Code</span></td>
+                                <td>@if (s.Type == Seance.Examen) { <strong>@s.Type</strong> } else { @s.Type }</td>
+                                <td class="mono masquer-etroit">@s.Cours?.UE?.Filiere?.Code · @s.Cours?.UE?.Niveau?.Code</td>
+                                <td>@(s.Cours?.Enseignant?.NomComplet ?? "—")</td>
+                                <td class="mono">@(s.Salle?.Code ?? "—")</td>
+                                <td class="actions">
+                                    <a asp-controller="Absences" asp-action="Appel" asp-route-seanceId="@s.Id">Appel</a>
+                                    <a asp-action="Edit" asp-route-id="@s.Id">Modifier</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+}

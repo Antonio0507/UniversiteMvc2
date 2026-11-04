@@ -195,7 +195,7 @@ public class PaiementsController : AppController
         var inscription = await _context.Inscriptions.AsNoTracking().FirstOrDefaultAsync(i => i.Id == paiement.InscriptionId);
         if (inscription == null) return;
 
-        var du = await _context.TarifDeAsync(inscription);
+        var du = await _context.DuAsync(inscription);
         if (du == null) return;
 
         var autres = await _context.Paiements

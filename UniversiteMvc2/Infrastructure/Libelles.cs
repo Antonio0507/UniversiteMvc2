@@ -31,6 +31,7 @@ public static class Libelles
         null => "—",
         string texte => texte.Length == 0 ? "—" : texte,
         DateTime date => Formats.Date(date),
+        TimeSpan heure => Formats.Heure(heure),
         decimal montant when metadonnees.DataTypeName == "Currency" => Formats.Montant(montant),
         decimal nombre => Formats.Nombre(nombre),
         bool vrai => vrai ? "Oui" : "Non",

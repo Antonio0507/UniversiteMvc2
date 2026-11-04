@@ -1,0 +1,111 @@
+@model List<LigneDeliberation>
+@{
+    ViewData["Title"] = "Délibérations";
+    var annee = ViewData["annee"] as AnneeAcad;
+    var toutes = ViewData["toutes"] as List<LigneDeliberation> ?? [];
+    IEnumerable<SelectListItem> Liste(string nom) => (IEnumerable<SelectListItem>)ViewData[nom]!;
+    var filtres = Context.Request.Query.ToDictionary(p => p.Key, p => p.Value.ToString());
+    filtres["anneeId"] = annee?.Id.ToString() ?? "";
+    var admis = toutes.Count(l => l.Bilan.Admis);
+    var taux = toutes.Count == 0 ? 0 : admis * 100.0 / toutes.Count;
+    var filiereId = Context.Request.Query["filiereId"].ToString();
+    var niveauId = Context.Request.Query["niveauId"].ToString();
+}
+
+<header class="entete">
+    <div>
+        <h1>Délibérations</h1>
+        <p class="entete__resume">Résultats calculés à partir des notes retenues, pour les inscriptions validées. Une UE est validée à partir de @Formats.Note(Note.Seuil)/20 ; sans toutes ses UE, un étudiant est admis par compensation si sa moyenne atteint @Formats.Note(Note.Seuil)/20.</p>
+    </div>
+    <div class="entete__actions">
+        @if (annee != null)
+        {
+            <a asp-action="Exporter" asp-all-route-data="filtres" class="btn">Exporter (CSV)</a>
+            @if (!string.IsNullOrEmpty(filiereId) && !string.IsNullOrEmpty(niveauId))
+            {
+                <a asp-controller="Documents" asp-action="Index" asp-route-type="@TypeDocument.ProcesVerbal" asp-route-anneeAcadId="@annee.Id"
+                   asp-route-filiereId="@filiereId" asp-route-niveauId="@niveauId" class="btn btn--plein">Procès-verbal PDF</a>
+            }
+        }
+    </div>
+</header>
+
+<form method="get" class="filtres">
+    <label class="sr" for="anneeId">Année</label>
+    <select id="anneeId" name="anneeId" asp-items='Liste("AnneeId")'></select>
+    <label class="sr" for="filiereId">Filière</label>
+    <select id="filiereId" name="filiereId" asp-items='Liste("FiliereId")'><option value="">Toutes les filières</option></select>
+    <label class="sr" for="niveauId">Niveau</label>
+    <select id="niveauId" name="niveauId" asp-items='Liste("NiveauId")'><option value="">Tous les niveaux</option></select>
+    <label class="sr" for="decision">Décision</label>
+    <select id="decision" name="decision" asp-items='Liste("Decision")'><option value="">Toutes les décisions</option></select>
+    <button class="btn" type="submit">Afficher</button>
+</form>
+
+@if (toutes.Count > 0)
+{
+    <section class="chiffres" aria-label="Synthèse">
+        <div class="chiffre">
+            <span class="etiquette">Taux de réussite</span>
+            <span class="chiffre__valeur">@taux.ToString("0", Formats.Fr)<small>%</small></span>
+            <span class="chiffre__note">sur @Formats.Pluriel(toutes.Count, "étudiant")</span>
+        </div>
+        <div class="chiffre">
+            <span class="etiquette">Admis</span>
+            <span class="chiffre__valeur">@admis</span>
+            <span class="chiffre__note">dont @toutes.Count(l => l.Bilan.Decision == Decisions.AdmisCompensation) par compensation</span>
+        </div>
+        <div class="chiffre">
+            <span class="etiquette">@Decisions.Ajourne</span>
+            <span class="chiffre__valeur">@toutes.Count(l => l.Bilan.Decision == Decisions.Ajourne)</span>
+        </div>
+        <div class="chiffre">
+            <span class="etiquette">@Decisions.Incomplet</span>
+            <span class="chiffre__valeur">@toutes.Count(l => l.Bilan.Decision == Decisions.Incomplet)</span>
+            <span class="chiffre__note">au moins une UE sans note</span>
+        </div>
+    </section>
+}
+
+@if (annee == null)
+{
+    <p class="vide">Aucune année académique. <a asp-controller="AnneesAcad" asp-action="Create">Ouvrir une année</a></p>
+}
+else if (Model.Count == 0)
+{
+    <p class="vide">Aucune inscription validée ne correspond pour @annee.Libelle.</p>
+}
+else
+{
+    <div class="defilement">
+        <table class="registre">
+            <thead>
+                <tr>
+                    <th class="masquer-etroit">Promotion</th>
+                    <th class="num">Rang</th>
+                    <th>Matricule</th>
+                    <th>Étudiant</th>
+                    <th class="num">Moyenne</th>
+                    <th class="num">Crédits</th>
+                    <th class="num masquer-etroit">UE sans note</th>
+                    <th>Décision</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var l in Model)
+                {
+                    <tr>
+                        <td class="mono masquer-etroit">@l.Inscription.Filiere?.Code · @l.Inscription.Niveau?.Code</td>
+                        <td class="num">@(l.Rang?.ToString() ?? "—")</td>
+                        <td class="mono">@l.Inscription.Etudiant?.Matricule</td>
+                        <td><a asp-controller="Inscriptions" asp-action="Details" asp-route-id="@l.Inscription.Id" class="lien-fort">@l.Inscription.Etudiant?.NomComplet</a></td>
+                        <td class="num">@Formats.Note(l.Bilan.Moyenne)</td>
+                        <td class="num">@l.Bilan.CreditsValides / @l.Bilan.CreditsTotal</td>
+                        <td class="num masquer-etroit">@(l.Bilan.UESansNote > 0 ? l.Bilan.UESansNote.ToString() : "—")</td>
+                        <td>@if (l.Bilan.Admis) { <strong>@l.Bilan.Decision</strong> } else { @l.Bilan.Decision }</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

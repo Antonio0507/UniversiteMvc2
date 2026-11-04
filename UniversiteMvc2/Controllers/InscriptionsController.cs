@@ -67,7 +67,10 @@ public class InscriptionsController : AppController
         var inscription = await ChargerAsync(id.Value);
         if (inscription == null) return NotFound();
 
-        ViewData["solde"] = new Solde(await _context.TarifDeAsync(inscription), inscription.Paiements.Sum(p => p.Montant));
+        var tarif = await _context.TarifDeAsync(inscription);
+        var aides = inscription.Aides.Sum(a => a.Montant);
+        ViewData["tarif"] = tarif;
+        ViewData["solde"] = new Solde(tarif == null ? null : Solde.Net(tarif.Value, aides), inscription.Paiements.Sum(p => p.Montant));
 
         // Toutes les UE du cursus, notées ou non
         var ues = await _context.UEs.AsNoTracking()
@@ -170,10 +173,14 @@ public class InscriptionsController : AppController
 
         var paiements = inscription.Paiements.Count;
         var notes = inscription.Notes.Count;
+        var aides = inscription.Aides.Count;
+        var absences = inscription.Absences.Count;
         return ConfirmerSuppression("Supprimer l'inscription",
             $"{inscription.Etudiant?.NomComplet} · {inscription.Filiere?.Code} {inscription.Niveau?.Code} · {inscription.AnneeAcad?.Libelle}", inscription.Id,
             blocages: Si((paiements, $"{Formats.Pluriel(paiements, "paiement enregistré", "paiements enregistrés")} sur cette inscription."),
-                (notes, $"{Formats.Pluriel(notes, "note enregistrée", "notes enregistrées")} sur cette inscription.")));
+                (notes, $"{Formats.Pluriel(notes, "note enregistrée", "notes enregistrées")} sur cette inscription."),
+                (aides, $"{Formats.Pluriel(aides, "aide accordée", "aides accordées")} sur cette inscription."),
+                (absences, $"{Formats.Pluriel(absences, "absence relevée", "absences relevées")} sur cette inscription.")));
     }
 
     [HttpPost, ActionName("Delete")]
@@ -194,6 +201,8 @@ public class InscriptionsController : AppController
             .Include(i => i.AnneeAcad)
             .Include(i => i.Paiements)
             .Include(i => i.Notes)
+            .Include(i => i.Aides)
+            .Include(i => i.Absences).ThenInclude(a => a.Seance).ThenInclude(s => s!.Cours)
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Id == id);
 

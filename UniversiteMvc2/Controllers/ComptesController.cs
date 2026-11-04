@@ -105,12 +105,7 @@ public class ComptesController : AppController
             return RedirectToAction(nameof(Index));
         }
 
-        var provisoire = MotsDePasse.Generer();
-        compte.MotDePasseHash = _hacheur.HashPassword(compte, provisoire);
-        compte.DoitChangerMotDePasse = true;
-        compte.EchecsConnexion = 0;
-        compte.VerrouilleJusquA = null;
-        compte.Jeton = Guid.NewGuid().ToString();
+        var provisoire = MotsDePasse.Reinitialiser(compte);
         await _context.SaveChangesAsync();
 
         Information($"Mot de passe provisoire de {compte.Email} : {provisoire} — à transmettre maintenant, il ne sera plus affiché.");

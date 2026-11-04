@@ -28,6 +28,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<Paiement> Paiements { get; set; }
     public DbSet<Tarif> Tarifs { get; set; }
     public DbSet<Note> Notes { get; set; }
+    public DbSet<Salle> Salles { get; set; }
+    public DbSet<Seance> Seances { get; set; }
+    public DbSet<Absence> Absences { get; set; }
+    public DbSet<Aide> Aides { get; set; }
     public DbSet<Compte> Comptes { get; set; }
     public DbSet<JournalAudit> JournalAudit { get; set; }
 
@@ -125,6 +129,17 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Tarif>().HasOne(t => t.AnneeAcad).WithMany().HasForeignKey(t => t.AnneeAcadId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Tarif>().HasOne(t => t.Filiere).WithMany().HasForeignKey(t => t.FiliereId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Tarif>().HasOne(t => t.Niveau).WithMany().HasForeignKey(t => t.NiveauId).OnDelete(DeleteBehavior.Restrict);
+
+        // Emploi du temps et assiduité : une séance garde son historique d'appel ; supprimer la séance supprime son appel
+        modelBuilder.Entity<Salle>().HasIndex(s => s.Code).IsUnique();
+        modelBuilder.Entity<Seance>().HasIndex(s => s.Date);
+        modelBuilder.Entity<Absence>().HasIndex(a => new { a.SeanceId, a.InscriptionId }).IsUnique();
+        modelBuilder.Entity<Seance>().HasOne(s => s.Cours).WithMany(c => c.Seances).HasForeignKey(s => s.CoursId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Seance>().HasOne(s => s.Salle).WithMany(s => s.Seances).HasForeignKey(s => s.SalleId).OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<Absence>().HasOne(a => a.Seance).WithMany(s => s.Absences).HasForeignKey(a => a.SeanceId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<Absence>().HasOne(a => a.Inscription).WithMany(i => i.Absences).HasForeignKey(a => a.InscriptionId).OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Aide>().HasOne(a => a.Inscription).WithMany(i => i.Aides).HasForeignKey(a => a.InscriptionId).OnDelete(DeleteBehavior.Restrict);
     }
 
     // --- Journal d'audit ----------------------------------------------------

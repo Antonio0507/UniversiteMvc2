@@ -12,7 +12,7 @@ using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Controllers;
 
-// Formulaire de génération des documents PDF (attestation, relevé, liste, reçu)
+// Formulaire de génération des documents PDF (attestation, relevé, liste, reçu, procès-verbal)
 public class DocumentsController : AppController
 {
     private readonly Etablissement _etablissement;
@@ -24,7 +24,7 @@ public class DocumentsController : AppController
 
     [HttpGet]
     public async Task<IActionResult> Index(TypeDocument type = TypeDocument.AttestationInscription,
-        int? inscriptionId = null, int? paiementId = null, int? anneeAcadId = null)
+        int? inscriptionId = null, int? paiementId = null, int? anneeAcadId = null, int? filiereId = null, int? niveauId = null)
     {
         var demande = new DemandeDocument
         {
@@ -32,6 +32,8 @@ public class DocumentsController : AppController
             InscriptionId = inscriptionId,
             PaiementId = paiementId,
             AnneeAcadId = anneeAcadId,
+            FiliereId = filiereId,
+            NiveauId = niveauId,
             Lieu = _etablissement.Ville
         };
         await RemplirListesAsync(demande);
@@ -52,6 +54,9 @@ public class DocumentsController : AppController
     [HttpGet]
     public async Task<IActionResult> Telecharger(TypeDocument type, int id)
     {
+        // Type inconnu : le binding le rejette et laisse la valeur par défaut, qui produirait une attestation
+        if (!ModelState.IsValid) return NotFound();
+
         var demande = new DemandeDocument { Type = type, InscriptionId = id, PaiementId = id, Lieu = _etablissement.Ville };
         if (await GenererAsync(demande) is { } pdf) return pdf;
 
@@ -100,7 +105,7 @@ public class DocumentsController : AppController
                 }
                 else
                 {
-                    document = new RelevePaiements(_etablissement, demande, inscription, await _context.TarifDeAsync(inscription));
+                    document = new RelevePaiements(_etablissement, demande, inscription, await _context.DuAsync(inscription));
                     fichier = $"releve-{inscription.Etudiant?.Matricule}-{inscription.AnneeAcad?.Libelle}";
                 }
                 break;
@@ -122,6 +127,25 @@ public class DocumentsController : AppController
                 fichier = $"liste-inscrits-{annee.Libelle}";
                 break;
 
+            case TypeDocument.ProcesVerbal:
+                var anneePv = demande.AnneeAcadId == null ? null : await _context.AnneesAcad.FindAsync(demande.AnneeAcadId);
+                var filiere = demande.FiliereId == null ? null : await _context.Filieres.FindAsync(demande.FiliereId);
+                var niveau = demande.NiveauId == null ? null : await _context.Niveaux.FindAsync(demande.NiveauId);
+                if (anneePv == null || filiere == null || niveau == null)
+                {
+                    ModelState.AddModelError(string.Empty, "Le procès-verbal porte sur une promotion : choisissez l'année, la filière et le niveau.");
+                    break;
+                }
+                var resultats = await _context.CalculerAsync(anneePv.Id, filiere.Id, niveau.Id);
+                if (resultats.Count == 0)
+                {
+                    ModelState.AddModelError(string.Empty, "Aucune inscription validée dans cette promotion.");
+                    break;
+                }
+                document = new ProcesVerbal(_etablissement, demande, anneePv, filiere, niveau, resultats);
+                fichier = $"pv-{filiere.Code}-{niveau.Code}-{anneePv.Libelle}";
+                break;
+
             case TypeDocument.RecuPaiement:
                 var paiement = demande.PaiementId == null ? null : await _context.Paiements.AsNoTrackingWithIdentityResolution()
                     .Include(p => p.Inscription).ThenInclude(i => i!.Etudiant)
@@ -136,7 +160,7 @@ public class DocumentsController : AppController
                     ModelState.AddModelError(nameof(demande.PaiementId), "Choisissez un paiement.");
                     break;
                 }
-                document = new RecuPaiement(_etablissement, demande, paiement, await _context.TarifDeAsync(paiement.Inscription!));
+                document = new RecuPaiement(_etablissement, demande, paiement, await _context.DuAsync(paiement.Inscription!));
                 fichier = $"recu-{Formats.NumeroRecu(paiement.Id)}";
                 break;
         }
