@@ -32,7 +32,19 @@
                 <champ asp-for="Email" class="champ--large" />
             }
             <champ asp-for="Nom" class="champ--large" />
-            <champ asp-for="Role" asp-items="(IEnumerable<SelectListItem>)ViewData[nameof(Model.Role)]!" />
+            @if (Model.EtudiantId != null)
+            {
+                <div class="champ">
+                    <span class="champ__libelle">Profil</span>
+                    <span>@Roles.Etudiant</span>
+                    <input type="hidden" name="Role" value="@Roles.Etudiant" />
+                    <span class="champ__aide">Un compte étudiant donne accès uniquement à l'espace de l'étudiant.</span>
+                </div>
+            }
+            else
+            {
+                <champ asp-for="Role" asp-items="(IEnumerable<SelectListItem>)ViewData[nameof(Model.Role)]!" aide="Ce que chaque profil peut faire se règle dans Permissions." />
+            }
             @if (!creation)
             {
                 <div class="champ">
@@ -47,6 +59,6 @@
 
     <div class="formulaire__actions">
         <button type="submit" class="btn btn--plein">@(creation ? "Créer le compte" : "Enregistrer")</button>
-        <a asp-action="Index" class="btn btn--lien">Annuler</a>
+        <a asp-action="Index" asp-route-etudiants="@(Model.EtudiantId != null)" class="btn btn--lien">Annuler</a>
     </div>
 </form>

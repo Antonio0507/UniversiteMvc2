@@ -55,8 +55,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<Absence> Absences { get; set; }
     /// <summary>Table des bourses, exonérations et réductions.</summary>
     public DbSet<Aide> Aides { get; set; }
-    /// <summary>Table des comptes du personnel.</summary>
+    /// <summary>Table des comptes de connexion (personnel et étudiants).</summary>
     public DbSet<Compte> Comptes { get; set; }
+    /// <summary>Permissions des profils du personnel, réglées par l'administrateur.</summary>
+    public DbSet<Permission> Permissions { get; set; }
     /// <summary>Journal d'audit : une ligne par écriture ou événement de sécurité.</summary>
     public DbSet<JournalAudit> JournalAudit { get; set; }
 
@@ -167,6 +169,13 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Absence>().HasOne(a => a.Inscription).WithMany(i => i.Absences).HasForeignKey(a => a.InscriptionId).OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Aide>().HasOne(a => a.Inscription).WithMany(i => i.Aides).HasForeignKey(a => a.InscriptionId).OnDelete(DeleteBehavior.Restrict);
+
+        // Un compte par étudiant au plus ; un dossier qui a un compte ne se supprime pas
+        modelBuilder.Entity<Compte>().HasIndex(c => c.EtudiantId).IsUnique();
+        modelBuilder.Entity<Compte>().HasOne(c => c.Etudiant).WithMany().HasForeignKey(c => c.EtudiantId).OnDelete(DeleteBehavior.Restrict);
+
+        // Une case de la matrice des permissions par profil et par section
+        modelBuilder.Entity<Permission>().HasIndex(p => new { p.Role, p.Section }).IsUnique();
     }
 
     // --- Journal d'audit ----------------------------------------------------

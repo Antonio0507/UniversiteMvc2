@@ -1,0 +1,76 @@
+@model IReadOnlyDictionary<string, IReadOnlyDictionary<string, Acces>>
+@using UniversiteMvc2.Controllers
+@{
+    ViewData["Title"] = "Permissions";
+    var niveaux = Enum.GetValues<Acces>();
+    string Libelle(Acces a) => a switch { Acces.Ecriture => "Écriture", Acces.Lecture => "Lecture", _ => "Aucun accès" };
+    var modifiees = Roles.Configurables.Sum(r => MatriceDroits.Sections.Count(s => Model[r][s.Controleur] != MatriceDroits.ParDefaut(r, s)));
+}
+
+<header class="entete">
+    <div>
+        <h1>Permissions</h1>
+        <p class="entete__resume">
+            Accès de chaque profil du personnel à chaque section. L'administrateur a toujours tous les droits ; Comptes,
+            Permissions et Journal lui restent réservés. Un étudiant n'accède qu'à son espace.
+        </p>
+    </div>
+    <div class="entete__actions">
+        <form asp-action="Reinitialiser" method="post">
+            <button type="submit" class="btn" @(modifiees == 0 ? "disabled" : null)>Rétablir les valeurs par défaut</button>
+        </form>
+    </div>
+</header>
+
+<form asp-action="Index" method="post">
+    <p class="discret">
+        <strong>Lecture</strong> : consulter. <strong>Écriture</strong> : consulter, créer, modifier, supprimer et exporter.
+        @Formats.Pluriel(modifiees, "case diffère", "cases diffèrent") des valeurs par défaut (marquées ●).
+        Les changements s'appliquent dès la page suivante de chaque utilisateur connecté.
+    </p>
+
+    <div class="defilement">
+        <table class="registre matrice">
+            <thead>
+                <tr>
+                    <th>Section</th>
+                    @foreach (var role in Roles.Configurables)
+                    {
+                        <th>@role</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var groupe in MatriceDroits.Sections.GroupBy(s => s.Groupe))
+                {
+                    <tr class="matrice__groupe"><td colspan="@(Roles.Configurables.Length + 1)">@groupe.Key</td></tr>
+                    @foreach (var s in groupe)
+                    {
+                        <tr>
+                            <td><span class="mono discret">@s.Numero</span> @s.Titre</td>
+                            @foreach (var role in Roles.Configurables)
+                            {
+                                var acces = Model[role][s.Controleur];
+                                var defaut = MatriceDroits.ParDefaut(role, s);
+                                var champ = PermissionsController.Champ(role, s);
+                                <td>
+                                    <label class="sr" for="@champ">@role — @s.Titre</label>
+                                    <select id="@champ" name="@champ" data-acces="@acces">
+                                        @foreach (var niveau in niveaux)
+                                        {
+                                            <option value="@niveau" selected="@(niveau == acces)">@Libelle(niveau)@(niveau == defaut ? " ●" : "")</option>
+                                        }
+                                    </select>
+                                </td>
+                            }
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="formulaire__actions">
+        <button type="submit" class="btn btn--plein">Enregistrer les permissions</button>
+    </div>
+</form>

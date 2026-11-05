@@ -124,6 +124,9 @@ namespace UniversiteMvc2.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<int?>("EtudiantId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Jeton")
                         .IsRequired()
                         .HasMaxLength(36)
@@ -150,6 +153,9 @@ namespace UniversiteMvc2.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("EtudiantId")
                         .IsUnique();
 
                     b.ToTable("Comptes");
@@ -365,6 +371,33 @@ namespace UniversiteMvc2.Data.Migrations
                     b.HasIndex("InscriptionId");
 
                     b.ToTable("Paiements");
+                });
+
+            modelBuilder.Entity("UniversiteMvc2.Models.Permission", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<int>("Acces")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("Section")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Role", "Section")
+                        .IsUnique();
+
+                    b.ToTable("Permissions");
                 });
 
             modelBuilder.Entity("UniversiteMvc2.Models.Salle", b =>
@@ -606,6 +639,16 @@ namespace UniversiteMvc2.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Inscription");
+                });
+
+            modelBuilder.Entity("UniversiteMvc2.Models.Compte", b =>
+                {
+                    b.HasOne("UniversiteMvc2.Models.Etudiant", "Etudiant")
+                        .WithMany()
+                        .HasForeignKey("EtudiantId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Etudiant");
                 });
 
             modelBuilder.Entity("UniversiteMvc2.Models.Cours", b =>

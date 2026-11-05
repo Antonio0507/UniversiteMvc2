@@ -1,0 +1,239 @@
+@model EspaceEtudiant
+@{
+    ViewData["Title"] = "Mon espace";
+    var e = Model.Etudiant;
+    var i = Model.Inscription;
+    var validee = i?.Statut == Inscription.Validee;
+    string Semaine(DateTime jour) => jour.ToString("yyyy-MM-dd");
+    var absences = i?.Absences.OrderByDescending(a => a.Seance?.Date).ThenByDescending(a => a.Seance?.HeureDebut).ToList() ?? [];
+    var paiements = i?.Paiements.OrderBy(p => p.DatePaiement).ToList() ?? [];
+}
+
+<p class="fil">Mon espace</p>
+
+<header class="entete">
+    <div>
+        <p class="entete__sur"><span class="mono">@e.Matricule</span>@(i == null ? "" : $" · {i.AnneeAcad?.Libelle}")</p>
+        <h1>@e.Nom <span class="leger">@e.Prenom</span></h1>
+        @if (i != null)
+        {
+            <p class="entete__resume">@i.Filiere?.Nom · @i.Niveau?.Libelle · <span class="statut" data-statut="@i.Statut">@i.Statut</span></p>
+        }
+    </div>
+    @if (i != null)
+    {
+        <div class="entete__actions">
+            @if (validee)
+            {
+                <a asp-action="Document" asp-route-type="@TypeDocument.AttestationInscription" asp-route-id="@i.Id" class="btn btn--plein">Attestation PDF</a>
+                <a asp-action="Document" asp-route-type="@TypeDocument.ReleveNotes" asp-route-id="@i.Id" class="btn">Relevé de notes PDF</a>
+            }
+            <a asp-action="Document" asp-route-type="@TypeDocument.RelevePaiements" asp-route-id="@i.Id" class="btn">Relevé des paiements PDF</a>
+        </div>
+    }
+</header>
+
+@if (Model.Inscriptions.Count > 1)
+{
+    <form method="get" class="filtres">
+        <label class="sr" for="inscriptionId">Année</label>
+        <select id="inscriptionId" name="inscriptionId">
+            @foreach (var x in Model.Inscriptions)
+            {
+                <option value="@x.Id" selected="@(x.Id == i?.Id)">@x.AnneeAcad?.Libelle · @x.Filiere?.Code @x.Niveau?.Code · @x.Statut</option>
+            }
+        </select>
+        <button class="btn" type="submit">Afficher</button>
+    </form>
+}
+
+@if (i == null)
+{
+    <p class="vide">Vous n'avez encore aucune inscription.</p>
+}
+else
+{
+    @if (i.Statut == Inscription.EnAttente)
+    {
+        <p class="vide">Votre inscription est en attente de validation par la scolarité. L'attestation et le relevé de notes seront disponibles une fois l'inscription validée.</p>
+    }
+    else if (i.Statut == Inscription.Annulee)
+    {
+        <p class="resume-erreurs">Cette inscription a été annulée. Adressez-vous à la scolarité pour toute question.</p>
+    }
+
+    <dl class="fiche">
+        <div><dt>Frais de scolarité</dt><dd>@(Model.Tarif == null ? "Pas encore fixés" : Formats.Montant(Model.Tarif.Value))</dd></div>
+        @if (i.Aides.Count > 0)
+        {
+            <div><dt>Bourses et exonérations</dt><dd>− @Formats.Montant(i.Aides.Sum(a => a.Montant))</dd></div>
+        }
+        <div><dt>Versé</dt><dd>@Formats.Montant(Model.Solde!.Verse)</dd></div>
+        <div><dt>Reste à payer</dt><dd class="grand">@(Model.Solde.Reste == null ? "—" : Formats.Montant(Model.Solde.Reste.Value))</dd></div>
+    </dl>
+
+    <section class="bloc">
+        <div class="bloc__tete">
+            <h2 class="bloc__titre">Emploi du temps · semaine du @Formats.DateLongue(Model.Lundi) <span class="bloc__compte">@Model.Seances.Count</span></h2>
+            <div class="groupe-boutons">
+                <a asp-action="Index" asp-route-inscriptionId="@i.Id" asp-route-semaine="@Semaine(Model.Lundi.AddDays(-7))" class="btn btn--lien">← Précédente</a>
+                <a asp-action="Index" asp-route-inscriptionId="@i.Id" class="btn btn--lien">Cette semaine</a>
+                <a asp-action="Index" asp-route-inscriptionId="@i.Id" asp-route-semaine="@Semaine(Model.Lundi.AddDays(7))" class="btn btn--lien">Suivante →</a>
+            </div>
+        </div>
+        @if (Model.Seances.Count == 0)
+        {
+            <p class="vide">Aucune séance programmée cette semaine.</p>
+        }
+        else
+        {
+            <div class="defilement">
+                <table class="registre">
+                    <thead>
+                        <tr><th>Jour</th><th>Horaire</th><th>Cours</th><th>Type</th><th>Enseignant</th><th>Salle</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in Model.Seances)
+                        {
+                            <tr>
+                                <td>@Formats.Jour(s.Date)</td>
+                                <td class="mono">@Formats.Heure(s.HeureDebut)–@Formats.Heure(s.HeureFin)</td>
+                                <td>@s.Cours?.Intitule</td>
+                                <td>@if (s.Type == Seance.Examen) { <strong>@s.Type</strong> } else { @s.Type }</td>
+                                <td>@(s.Cours?.Enseignant?.NomComplet ?? "—")</td>
+                                <td class="mono">@(s.Salle?.Code ?? "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section class="bloc">
+        <div class="bloc__tete">
+            <h2 class="bloc__titre">Notes <span class="bloc__compte">@i.Notes.Count</span></h2>
+            @if (validee && Model.Bilan != null)
+            {
+                <span class="etiquette">Moyenne @Formats.Note(Model.Bilan.Moyenne) · @Model.Bilan.CreditsValides / @Model.Bilan.CreditsTotal crédits · @Model.Bilan.Decision</span>
+            }
+        </div>
+        @if (Model.UEs.Count == 0)
+        {
+            <p class="vide">Aucune unité d'enseignement pour ce cursus.</p>
+        }
+        else
+        {
+            <div class="defilement">
+                <table class="registre">
+                    <thead>
+                        <tr><th>UE</th><th class="num">Crédits</th><th class="num">Session normale</th><th class="num">Rattrapage</th><th class="num">Retenue</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var ue in Model.UEs)
+                        {
+                            var note = i.Notes.FirstOrDefault(n => n.UEId == ue.Id);
+                            <tr>
+                                <td>@ue</td>
+                                <td class="num">@ue.Credits</td>
+                                <td class="num">@Formats.Note(note?.Valeur)</td>
+                                <td class="num">@Formats.Note(note?.Rattrapage)</td>
+                                <td class="num">@Formats.Note(note?.Retenue)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section class="bloc">
+        <div class="bloc__tete">
+            <h2 class="bloc__titre">Paiements <span class="bloc__compte">@paiements.Count</span></h2>
+        </div>
+        @if (paiements.Count == 0)
+        {
+            <p class="vide">Aucun paiement enregistré.</p>
+        }
+        else
+        {
+            <table class="registre">
+                <thead>
+                    <tr><th>Reçu</th><th>Date</th><th>Mode</th><th class="num">Montant</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in paiements)
+                    {
+                        <tr>
+                            <td class="mono">@Formats.NumeroRecu(p.Id)</td>
+                            <td>@Formats.Date(p.DatePaiement)</td>
+                            <td>@p.Mode</td>
+                            <td class="num">@Formats.Montant(p.Montant)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+    <section class="bloc">
+        <div class="bloc__tete">
+            <h2 class="bloc__titre">Absences <span class="bloc__compte">@absences.Count</span></h2>
+            @if (absences.Count > 0)
+            {
+                <span class="etiquette">@Formats.Heures(absences.Sum(a => a.Seance!.Duree)) · dont @Formats.Heures(absences.Where(a => !a.Justifiee).Sum(a => a.Seance!.Duree)) non justifiées</span>
+            }
+        </div>
+        @if (absences.Count == 0)
+        {
+            <p class="vide">Aucune absence relevée.</p>
+        }
+        else
+        {
+            <table class="registre">
+                <thead>
+                    <tr><th>Date</th><th>Cours</th><th>Justifiée</th><th>Motif</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var a in absences)
+                    {
+                        <tr>
+                            <td>@Formats.Date(a.Seance!.Date) <span class="leger mono">@Formats.Heure(a.Seance.HeureDebut)</span></td>
+                            <td>@a.Seance.Cours?.Intitule</td>
+                            <td>@(a.Justifiee ? "Oui" : "Non")</td>
+                            <td>@(a.Motif ?? "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+}
+
+@if (Model.Reinscription != null)
+{
+    <section class="bloc">
+        <div class="bloc__tete">
+            <h2 class="bloc__titre">Inscription @Model.Reinscription.Libelle</h2>
+        </div>
+        <form asp-action="Reinscription" method="post" class="filtres">
+            <label class="sr" for="filiereId">Filière</label>
+            <select id="filiereId" name="filiereId" asp-items='(IEnumerable<SelectListItem>)ViewData["FiliereId"]!' required><option value="">— Filière —</option></select>
+            <label class="sr" for="niveauId">Niveau</label>
+            <select id="niveauId" name="niveauId" asp-items='(IEnumerable<SelectListItem>)ViewData["NiveauId"]!' required><option value="">— Niveau —</option></select>
+            <button class="btn btn--plein" type="submit">Demander mon inscription</button>
+        </form>
+    </section>
+}
+
+<section class="bloc">
+    <div class="bloc__tete">
+        <h2 class="bloc__titre">Mes coordonnées</h2>
+    </div>
+    <dl class="fiche">
+        <div><dt>Date de naissance</dt><dd>@Formats.DateLongue(e.DateNaissance)</dd></div>
+        <div><dt>E-mail</dt><dd>@e.Email</dd></div>
+        <div><dt>Téléphone</dt><dd>@(e.Telephone ?? "—")</dd></div>
+    </dl>
+    <p class="discret">Une erreur ? Adressez-vous à la scolarité pour la corriger.</p>
+</section>

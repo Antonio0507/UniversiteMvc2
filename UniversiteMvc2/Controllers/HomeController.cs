@@ -15,10 +15,14 @@ public class HomeController : AppController
     /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     public HomeController(ApplicationDbContext context) : base(context) { }
 
-    /// <summary>Tableau de bord : par défaut l'année académique en cours</summary>
+    /// <summary>
+    /// Tableau de bord : par défaut l'année académique en cours. Un étudiant est renvoyé vers son espace.
+    /// </summary>
     /// <param name="annee">Année affichée ; par défaut l'année en cours, sinon la plus récente.</param>
     public async Task<IActionResult> Index(int? annee)
     {
+        if (User.IsInRole(Roles.Etudiant)) return RedirectToAction("Index", "EspaceEtudiant");
+
         var annees = await _context.AnneesAcad.AsNoTracking().OrderByDescending(a => a.DateDebut).ToListAsync();
         var aujourdhui = DateTime.Today;
         var choisie = annees.FirstOrDefault(a => a.Id == annee)

@@ -1,0 +1,77 @@
+@model Candidature
+@{
+    ViewData["Title"] = "Inscription en ligne";
+    var annee = ViewData["annee"] as AnneeAcad;
+}
+
+<div class="connexion connexion--large">
+    <header class="entete">
+        <div>
+            <h1>Inscription en ligne</h1>
+            <p class="entete__resume">
+                @if (annee == null)
+                {
+                    <text>Les inscriptions en ligne ne sont pas ouvertes pour le moment.</text>
+                }
+                else
+                {
+                    <text>Année académique @annee.Libelle. Votre dossier est créé tout de suite ; la scolarité valide ensuite votre inscription.</text>
+                }
+            </p>
+        </div>
+    </header>
+
+    @if (annee != null)
+    {
+        <form asp-action="Index" method="post" class="formulaire">
+            <div asp-validation-summary="ModelOnly" class="resume-erreurs"></div>
+
+            <section class="groupe">
+                <div>
+                    <h2 class="groupe__titre">Identité</h2>
+                </div>
+                <div class="grille-champs">
+                    <champ asp-for="Nom" />
+                    <champ asp-for="Prenom" />
+                    <champ asp-for="DateNaissance" />
+                    <champ asp-for="Telephone" />
+                    <champ asp-for="Email" class="champ--large" autocomplete="email" />
+                </div>
+            </section>
+
+            <section class="groupe">
+                <div>
+                    <h2 class="groupe__titre">Cursus demandé</h2>
+                </div>
+                <div class="grille-champs">
+                    <champ asp-for="FiliereId" asp-items="(IEnumerable<SelectListItem>)ViewData[nameof(Model.FiliereId)]!" vide="— Choisir —" />
+                    <champ asp-for="NiveauId" asp-items="(IEnumerable<SelectListItem>)ViewData[nameof(Model.NiveauId)]!" vide="— Choisir —" />
+                </div>
+            </section>
+
+            <section class="groupe">
+                <div>
+                    <h2 class="groupe__titre">Mot de passe</h2>
+                    <p class="groupe__note">Au moins @MotsDePasse.LongueurMinimale caractères, dont une lettre et un chiffre.</p>
+                </div>
+                <div class="grille-champs">
+                    <champ asp-for="MotDePasse" autocomplete="new-password" />
+                    <champ asp-for="Confirmation" autocomplete="new-password" />
+                </div>
+            </section>
+
+            <div class="formulaire__actions">
+                <button type="submit" class="btn btn--plein">Créer mon dossier</button>
+            </div>
+        </form>
+    }
+
+    <div class="connexion__liens">
+        <span>Votre dossier a déjà été créé par la scolarité ? <a asp-action="Activer">Activer mon compte</a></span>
+        <span>Vous avez déjà un compte ? <a asp-controller="Connexion" asp-action="Index">Se connecter</a></span>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1122,3 +1122,11 @@ select.champ__controle, .filtres select {
 .saisie-note { width: 5.5rem; padding: 4px 8px; border: 1px solid var(--filet); background: transparent; color: inherit; font: inherit; text-align: right; }
 .saisie-note:read-only { border-color: transparent; }
 .actions form { display: inline; }
+
+/* --- Permissions, inscription en ligne, espace étudiant ------------------- */
+
+.matrice select { min-width: 9.5rem; padding: 4px 8px; border: 1px solid var(--filet); background: var(--papier); color: inherit; font: inherit; }
+.matrice select[data-acces="Aucun"] { color: var(--encre-3); }
+.matrice__groupe td { padding-top: var(--e-5); font-size: var(--t-xs); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--encre-3); }
+.connexion--large { max-width: 720px; }
+.connexion__liens { display: grid; gap: var(--e-2); margin-top: var(--e-6); font-size: var(--t-s); color: var(--encre-3); }

@@ -10,8 +10,9 @@ using UniversiteMvc2.Models;
 namespace UniversiteMvc2.Controllers;
 
 /// <summary>
-/// Gestion des comptes du personnel (administrateurs uniquement, voir Navigation). Les comptes se désactivent mais ne
-/// se suppriment pas : le journal d'audit continue à les référencer.
+/// Gestion des comptes du personnel et des étudiants (administrateurs uniquement, voir Navigation). Les comptes se
+/// désactivent mais ne se suppriment pas : le journal d'audit continue à les référencer. Les comptes étudiants sont
+/// créés par l'étudiant lui-même (inscription en ligne ou activation) et gardent le profil Étudiant.
 /// </summary>
 public class ComptesController : AppController
 {
@@ -21,9 +22,17 @@ public class ComptesController : AppController
     /// <param name="context">Contexte de base de données, injecté par ASP.NET Core.</param>
     public ComptesController(ApplicationDbContext context) : base(context) { }
 
-    /// <summary>Liste des comptes du personnel, avec profil, état et dernière connexion.</summary>
-    public async Task<IActionResult> Index() =>
-        View(await _context.Comptes.AsNoTracking().OrderBy(c => c.Nom).ToListAsync());
+    /// <summary>Liste des comptes, avec profil, état et dernière connexion : le personnel, ou les étudiants.</summary>
+    /// <param name="etudiants">true pour les comptes étudiants.</param>
+    public async Task<IActionResult> Index(bool etudiants = false)
+    {
+        ViewData["etudiants"] = etudiants;
+        return View(await _context.Comptes.AsNoTracking()
+            .Include(c => c.Etudiant)
+            .Where(c => etudiants ? c.Role == Roles.Etudiant : c.Role != Roles.Etudiant)
+            .OrderBy(c => c.Nom)
+            .ToListAsync());
+    }
 
     /// <summary>Affiche le formulaire de création d'un compte.</summary>
     public IActionResult Create()
@@ -43,6 +52,8 @@ public class ComptesController : AppController
         // Renseigné par le serveur, pas par le formulaire
         ModelState.Remove(nameof(Compte.MotDePasseHash));
         ModelState.Remove(nameof(Compte.Jeton));
+        if (!Roles.Personnel.Contains(compte.Role))
+            ModelState.AddModelError(nameof(Compte.Role), "Les comptes étudiants sont créés par les étudiants eux-mêmes (inscription en ligne).");
 
         if (ModelState.IsValid)
         {
@@ -90,6 +101,11 @@ public class ComptesController : AppController
 
         if (await TryUpdateModelAsync(compte, string.Empty, c => c.Nom, c => c.Role, c => c.Actif))
         {
+            // Un compte étudiant reste étudiant, et un compte du personnel ne le devient pas
+            if (compte.EtudiantId != null) compte.Role = Roles.Etudiant;
+            else if (!Roles.Personnel.Contains(compte.Role))
+                ModelState.AddModelError(nameof(Compte.Role), "Le profil Étudiant est réservé aux comptes créés par les étudiants.");
+
             if ((roleAvant == Roles.Administrateur && actifAvant) && (compte.Role != Roles.Administrateur || !compte.Actif)
                 && !await _context.Comptes.AnyAsync(c => c.Id != id && c.Actif && c.Role == Roles.Administrateur))
                 ModelState.AddModelError(string.Empty, "Il doit rester au moins un administrateur actif.");
@@ -101,7 +117,7 @@ public class ComptesController : AppController
                 if (await EnregistrerAsync())
                 {
                     Succes("Compte mis à jour.");
-                    return RedirectToAction(nameof(Index));
+                    return RedirectToAction(nameof(Index), new { etudiants = compte.EtudiantId != null });
                 }
             }
         }
@@ -131,8 +147,8 @@ public class ComptesController : AppController
         await _context.SaveChangesAsync();
 
         Information($"Mot de passe provisoire de {compte.Email} : {provisoire} — à transmettre maintenant, il ne sera plus affiché.");
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { etudiants = compte.EtudiantId != null });
     }
 
-    private void RemplirListes(string? role = null) => ViewData["Role"] = new SelectList(Roles.Tous, role);
+    private void RemplirListes(string? role = null) => ViewData["Role"] = new SelectList(Roles.Personnel, role);
 }

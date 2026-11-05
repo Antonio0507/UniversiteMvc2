@@ -1,0 +1,36 @@
+@model Activation
+@{
+    ViewData["Title"] = "Activer mon compte";
+}
+
+<div class="connexion">
+    <header class="entete">
+        <div>
+            <h1>Activer mon compte</h1>
+            <p class="entete__resume">Pour les étudiants dont le dossier a été créé par la scolarité : ces informations doivent correspondre à votre dossier.</p>
+        </div>
+    </header>
+
+    <form asp-action="Activer" method="post" class="formulaire">
+        <div asp-validation-summary="ModelOnly" class="resume-erreurs"></div>
+
+        <champ asp-for="Matricule" />
+        <champ asp-for="DateNaissance" />
+        <champ asp-for="Email" autocomplete="email" />
+        <champ asp-for="MotDePasse" autocomplete="new-password" aide="Au moins @MotsDePasse.LongueurMinimale caractères, dont une lettre et un chiffre." />
+        <champ asp-for="Confirmation" autocomplete="new-password" />
+
+        <div class="formulaire__actions">
+            <button type="submit" class="btn btn--plein">Activer mon compte</button>
+        </div>
+    </form>
+
+    <div class="connexion__liens">
+        <span>Nouvel étudiant ? <a asp-action="Index">S'inscrire en ligne</a></span>
+        <span>Vous avez déjà un compte ? <a asp-controller="Connexion" asp-action="Index">Se connecter</a></span>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

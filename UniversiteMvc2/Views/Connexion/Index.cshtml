@@ -6,7 +6,7 @@
     <header class="entete">
         <div>
             <h1>Connexion</h1>
-            <p class="entete__resume">Accès réservé au personnel de l'établissement.</p>
+            <p class="entete__resume">Personnel et étudiants de l'établissement.</p>
         </div>
     </header>
 
@@ -27,4 +27,9 @@
             <button type="submit" class="btn btn--plein">Se connecter</button>
         </div>
     </form>
+
+    <div class="connexion__liens">
+        <span>Nouvel étudiant ? <a asp-controller="InscriptionEnLigne" asp-action="Index">S'inscrire en ligne</a></span>
+        <span>Dossier déjà créé par la scolarité ? <a asp-controller="InscriptionEnLigne" asp-action="Activer">Activer mon compte</a></span>
+    </div>
 </div>

@@ -74,7 +74,7 @@ public class EtudiantsController : AppController
     /// Affiche le formulaire de création, avec le matricule suivant de l'année proposé (ETU2026001, ETU2026002…).
     /// </summary>
     public async Task<IActionResult> Create() =>
-        View("Formulaire", new Etudiant { Matricule = await ProchainMatriculeAsync(), DateNaissance = new DateTime(2005, 1, 1) });
+        View("Formulaire", new Etudiant { Matricule = await _context.ProchainMatriculeAsync(), DateNaissance = new DateTime(2005, 1, 1) });
 
     /// <summary>
     /// Enregistre le dossier, puis ouvre sa fiche ; en cas d'erreur, réaffiche le
@@ -144,8 +144,10 @@ public class EtudiantsController : AppController
         if (etudiant == null) return NotFound();
 
         var inscriptions = await _context.Inscriptions.CountAsync(i => i.EtudiantId == id);
+        var comptes = await _context.Comptes.CountAsync(c => c.EtudiantId == id);
         return ConfirmerSuppression("Supprimer l'étudiant", $"{etudiant.NomComplet} — {etudiant.Matricule}", etudiant.Id,
-            blocages: Si((inscriptions, $"{Formats.Pluriel(inscriptions, "inscription rattachée", "inscriptions rattachées")} à ce dossier.")));
+            blocages: Si((inscriptions, $"{Formats.Pluriel(inscriptions, "inscription rattachée", "inscriptions rattachées")} à ce dossier."),
+                (comptes, "L'étudiant a un compte de connexion : désactivez-le plutôt dans Comptes.")));
     }
 
     /// <summary>Supprime le dossier étudiant après confirmation, puis revient à la liste.</summary>
@@ -158,20 +160,5 @@ public class EtudiantsController : AppController
         if (etudiant == null) return RedirectToAction(nameof(Index));
 
         return await SupprimerAsync(etudiant, $"Dossier de {etudiant.NomComplet} supprimé.");
-    }
-
-    // Matricule suivant de l'année : ETU2026001, ETU2026002…
-    private async Task<string> ProchainMatriculeAsync()
-    {
-        var prefixe = $"ETU{DateTime.Today.Year}";
-        var existants = await _context.Etudiants
-            .Where(e => e.Matricule.StartsWith(prefixe))
-            .Select(e => e.Matricule)
-            .ToListAsync();
-        var dernier = existants
-            .Select(m => int.TryParse(m[prefixe.Length..], out var n) ? n : 0)
-            .DefaultIfEmpty(0)
-            .Max();
-        return $"{prefixe}{dernier + 1:000}";
     }
 }

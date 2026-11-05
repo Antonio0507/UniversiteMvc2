@@ -1,17 +1,27 @@
 @model List<Compte>
 @{
     ViewData["Title"] = "Comptes";
+    var etudiants = (bool)ViewData["etudiants"]!;
 }
 
 <header class="entete">
     <div>
         <h1>Comptes</h1>
-        <p class="entete__resume">@Formats.Pluriel(Model.Count, "compte") · Scolarité et Comptabilité écrivent dans leurs modules, Consultation lit seulement.</p>
+        <p class="entete__resume">
+            @Formats.Pluriel(Model.Count, etudiants ? "compte étudiant" : "compte du personnel", etudiants ? "comptes étudiants" : "comptes du personnel")
+            · @(etudiants ? "créés par les étudiants (inscription en ligne ou activation), limités à leur espace." : "ce que chaque profil peut faire se règle dans Permissions.")
+        </p>
     </div>
     <div class="entete__actions">
+        <a asp-controller="Permissions" asp-action="Index" class="btn">Permissions</a>
         <a asp-action="Create" class="btn btn--plein">Nouveau compte</a>
     </div>
 </header>
+
+<nav class="filtres" aria-label="Type de comptes">
+    <a asp-action="Index" class="btn @(etudiants ? "btn--lien" : null)" aria-current="@(etudiants ? null : "page")">Personnel</a>
+    <a asp-action="Index" asp-route-etudiants="true" class="btn @(etudiants ? null : "btn--lien")" aria-current="@(etudiants ? "page" : null)">Étudiants</a>
+</nav>
 
 <div class="defilement">
     <table class="registre">
@@ -19,7 +29,7 @@
             <tr>
                 <th>Nom</th>
                 <th>E-mail</th>
-                <th>Profil</th>
+                <th>@(etudiants ? "Matricule" : "Profil")</th>
                 <th>État</th>
                 <th>Dernière connexion</th>
                 <th></th>
@@ -32,7 +42,7 @@
                 <tr>
                     <td><a asp-action="Edit" asp-route-id="@c.Id" class="lien-fort">@c.Nom</a></td>
                     <td class="discret">@c.Email</td>
-                    <td>@c.Role</td>
+                    <td class="@(etudiants ? "mono" : null)">@(etudiants ? c.Etudiant?.Matricule : c.Role)</td>
                     <td>@(!c.Actif ? "Désactivé" : verrouille ? "Verrouillé" : c.DoitChangerMotDePasse ? "Mot de passe provisoire" : "Actif")</td>
                     <td class="discret">@(c.DerniereConnexion == null ? "—" : Formats.Date(c.DerniereConnexion.Value))</td>
                     <td class="actions">

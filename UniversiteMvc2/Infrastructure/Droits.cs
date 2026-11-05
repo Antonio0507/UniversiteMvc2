@@ -4,13 +4,15 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Razor.TagHelpers;
+using Microsoft.EntityFrameworkCore;
+using UniversiteMvc2.Data;
 using UniversiteMvc2.Models;
 
 namespace UniversiteMvc2.Infrastructure;
 
 /// <summary>
-/// Règles d'accès, déduites du sommaire (Navigation) : une seule source pour le contrôle serveur et l'affichage des
-/// liens
+/// Règles d'accès : le sommaire (Navigation) liste les sections, la matrice des permissions (MatriceDroits) dit qui
+/// y accède. Une seule source pour le contrôle serveur et l'affichage des liens.
 /// </summary>
 public static class Droits
 {
@@ -20,6 +22,11 @@ public static class Droits
     /// Claim qui porte le jeton de session du compte ; s'il ne correspond plus à la base, la session est rejetée.
     /// </summary>
     public const string ClaimJeton = "jeton";
+    /// <summary>
+    /// Claim « Section=niveau » ajouté à chaque requête à partir de la matrice des permissions (jamais stocké dans le
+    /// cookie) : une permission modifiée s'applique dès la requête suivante.
+    /// </summary>
+    public const string ClaimAcces = "acces";
 
     // Actions GET qui ouvrent une écriture, ou sortent des données en masse
     private static readonly HashSet<string> ActionsEcriture = new(StringComparer.OrdinalIgnoreCase)
@@ -27,30 +34,46 @@ public static class Droits
         "Create", "Edit", "Delete", "Exporter", "ExporterImpayes"
     };
 
+    /// <summary>Claims d'accès correspondant à une ligne de la matrice des permissions.</summary>
+    /// <param name="acces">Niveau d'accès par section (nom du contrôleur).</param>
+    public static IEnumerable<Claim> Claims(IReadOnlyDictionary<string, Acces> acces) =>
+        acces.Select(a => new Claim(ClaimAcces, $"{a.Key}={(int)a.Value}"));
+
     /// <summary>
-    /// Indique si l'utilisateur peut consulter une section : toutes, sauf les sections réservées hors administrateur.
+    /// Niveau d'accès de l'utilisateur à une section : écriture pour l'administrateur ; aucun pour les autres sur une
+    /// section réservée ; sinon celui de la matrice des permissions.
+    /// </summary>
+    /// <param name="utilisateur">Utilisateur connecté.</param>
+    /// <param name="section">Section du sommaire.</param>
+    public static Acces Niveau(ClaimsPrincipal utilisateur, Section section)
+    {
+        if (utilisateur.IsInRole(Roles.Administrateur)) return Acces.Ecriture;
+        if (section.Reserve) return Acces.Aucun;
+
+        var prefixe = section.Controleur + "=";
+        var claim = utilisateur.FindFirst(c => c.Type == ClaimAcces && c.Value.StartsWith(prefixe, StringComparison.Ordinal));
+        return claim != null && int.TryParse(claim.Value[prefixe.Length..], out var n) && Enum.IsDefined((Acces)n) ? (Acces)n : Acces.Aucun;
+    }
+
+    /// <summary>
+    /// Indique si l'utilisateur peut consulter une section. Hors sommaire (tableau de bord, connexion…), la réponse
+    /// est oui : ces pages se protègent elles-mêmes.
     /// </summary>
     /// <param name="utilisateur">Utilisateur connecté.</param>
     /// <param name="controleur">Nom du contrôleur.</param>
     public static bool PeutLire(ClaimsPrincipal utilisateur, string? controleur)
     {
         var section = Navigation.Par(controleur);
-        return section == null || !section.Reserve || utilisateur.IsInRole(Roles.Administrateur);
+        return section == null || Niveau(utilisateur, section) >= Acces.Lecture;
     }
 
-    /// <summary>
-    /// Indique si l'utilisateur peut modifier une section : l'administrateur partout, les autres profils dans leurs
-    /// sections.
-    /// </summary>
+    /// <summary>Indique si l'utilisateur peut modifier une section.</summary>
     /// <param name="utilisateur">Utilisateur connecté.</param>
     /// <param name="controleur">Nom du contrôleur.</param>
     public static bool PeutEcrire(ClaimsPrincipal utilisateur, string? controleur)
     {
         var section = Navigation.Par(controleur);
-        if (section == null) return true;
-        if (utilisateur.IsInRole(Roles.Administrateur)) return true;
-        if (section.Reserve) return false;
-        return section.Ecriture == null || section.Ecriture.Any(utilisateur.IsInRole);
+        return section == null || Niveau(utilisateur, section) == Acces.Ecriture;
     }
 
     /// <summary>
@@ -66,6 +89,63 @@ public static class Droits
         var ecriture = !requeteLecture || (action != null && ActionsEcriture.Contains(action));
         return ecriture ? PeutEcrire(utilisateur, controleur) : PeutLire(utilisateur, controleur);
     }
+}
+
+/// <summary>
+/// Matrice des permissions : niveau d'accès de chaque profil du personnel à chaque section non réservée. Lue en base
+/// (table Permissions) et gardée en mémoire jusqu'à la prochaine modification ; une case sans ligne en base prend sa
+/// valeur par défaut.
+/// </summary>
+public class MatriceDroits
+{
+    private static readonly IReadOnlyDictionary<string, Acces> Vide = new Dictionary<string, Acces>();
+
+    private volatile IReadOnlyDictionary<string, IReadOnlyDictionary<string, Acces>>? _cache;
+
+    /// <summary>Sections dont l'administrateur règle l'accès : toutes, sauf les sections réservées.</summary>
+    public static IEnumerable<Section> Sections => Navigation.Sections.Where(s => !s.Reserve);
+
+    /// <summary>
+    /// Valeur par défaut d'une case : écriture si la section le prévoit pour ce profil (Section.Ecriture), lecture
+    /// sinon ; aucun accès pour un profil non configurable (Étudiant) ou une section réservée.
+    /// </summary>
+    /// <param name="role">Profil.</param>
+    /// <param name="section">Section.</param>
+    public static Acces ParDefaut(string role, Section section)
+    {
+        if (section.Reserve || !Roles.Configurables.Contains(role)) return Acces.Aucun;
+        return section.Ecriture == null || section.Ecriture.Contains(role) ? Acces.Ecriture : Acces.Lecture;
+    }
+
+    /// <summary>Ligne par défaut d'un profil : section → niveau d'accès.</summary>
+    /// <param name="role">Profil.</param>
+    public static IReadOnlyDictionary<string, Acces> ParDefaut(string role) =>
+        Sections.ToDictionary(s => s.Controleur, s => ParDefaut(role, s));
+
+    /// <summary>Matrice complète : profil configurable → section → niveau d'accès.</summary>
+    /// <param name="db">Contexte de base de données.</param>
+    public async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, Acces>>> ChargerAsync(ApplicationDbContext db)
+    {
+        if (_cache is { } cache) return cache;
+
+        var lignes = await db.Permissions.AsNoTracking().ToListAsync();
+        var matrice = Roles.Configurables.ToDictionary(
+            role => role,
+            role => (IReadOnlyDictionary<string, Acces>)Sections.ToDictionary(
+                s => s.Controleur,
+                s => lignes.FirstOrDefault(l => l.Role == role && l.Section == s.Controleur)?.Acces ?? ParDefaut(role, s)));
+        _cache = matrice;
+        return matrice;
+    }
+
+    /// <summary>Ligne d'un profil ; vide (aucun accès) pour un profil non configurable.</summary>
+    /// <param name="db">Contexte de base de données.</param>
+    /// <param name="role">Profil.</param>
+    public async Task<IReadOnlyDictionary<string, Acces>> PourAsync(ApplicationDbContext db, string role) =>
+        (await ChargerAsync(db)).TryGetValue(role, out var ligne) ? ligne : Vide;
+
+    /// <summary>À appeler après chaque modification de la table Permissions.</summary>
+    public void Invalider() => _cache = null;
 }
 
 /// <summary>

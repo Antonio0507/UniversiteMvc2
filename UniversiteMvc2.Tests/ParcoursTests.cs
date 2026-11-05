@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 using MySql.Data.MySqlClient;
+using UniversiteMvc2.Controllers;
 using UniversiteMvc2.Data;
 using UniversiteMvc2.Infrastructure;
 using UniversiteMvc2.Models;
@@ -183,7 +184,12 @@ public class ParcoursTests
             Assert.Contains("/Connexion", reponse.Headers.Location!.ToString());
         }
 
+        Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/EspaceEtudiant")).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/Permissions")).StatusCode);
+
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/Connexion")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/InscriptionEnLigne")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/InscriptionEnLigne/Activer")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/sante")).StatusCode);
     }
 
@@ -343,7 +349,7 @@ public class ParcoursTests
             ["Aides"] = await db.Aides.Select(e => e.Id).FirstAsync()
         });
 
-        var urls = new List<string> { "/", "/Notes", "/Documents", "/Comptes", "/Comptes/Create", "/Journal", "/Paiements/Impayes", "/Connexion/MotDePasse",
+        var urls = new List<string> { "/", "/Notes", "/Documents", "/Comptes", "/Comptes?etudiants=true", "/Comptes/Create", "/Permissions", "/Journal", "/Paiements/Impayes", "/Connexion/MotDePasse",
             "/Absences", $"/Absences/Appel?seanceId={ids["Seances"]}", "/Deliberations", $"/Aides/Create?inscriptionId={inscription}" };
         foreach (var (controleur, id) in ids)
             urls.AddRange([$"/{controleur}", $"/{controleur}/Create", $"/{controleur}/Details/{id}", $"/{controleur}/Edit/{id}", $"/{controleur}/Delete/{id}"]);
@@ -695,5 +701,138 @@ public class ParcoursTests
         var reponse = await admin.GetAsync("/Etudiants/Details/999999");
         Assert.Equal(HttpStatusCode.NotFound, reponse.StatusCode);
         Assert.Contains("Cette page n'existe pas", await reponse.TexteAsync());
+    }
+
+    private static (string, string)[] Candidature(int filiereId, int niveauId, string email) =>
+    [
+        ("Nom", "Amegan"), ("Prenom", "Yao"), ("DateNaissance", "2006-05-14"), ("Email", email), ("Telephone", ""),
+        ("FiliereId", filiereId.ToString()), ("NiveauId", niveauId.ToString()),
+        ("MotDePasse", "etudiant-Test-789"), ("Confirmation", "etudiant-Test-789")
+    ];
+
+    [MySqlFact]
+    public async Task Un_etudiant_s_inscrit_en_ligne_et_ne_voit_que_son_espace()
+    {
+        using var app = new Application();
+        var (filiere, niveau) = await app.AvecBaseAsync(async db => (await db.Filieres.Select(f => f.Id).FirstAsync(), await db.Niveaux.Select(n => n.Id).FirstAsync()));
+        var etudiant = app.Navigateur();
+
+        var reponse = await etudiant.EnvoyerAsync("/InscriptionEnLigne", "/InscriptionEnLigne", Candidature(filiere, niveau, "Yao.Amegan@Test.local"));
+        Assert.Equal(HttpStatusCode.Redirect, reponse.StatusCode);
+        Assert.Contains("/EspaceEtudiant", reponse.Headers.Location!.ToString());
+
+        var compte = await app.AvecBaseAsync(db => db.Comptes.AsNoTracking().Include(c => c.Etudiant).SingleAsync(c => c.Email == "yao.amegan@test.local"));
+        Assert.Equal(Roles.Etudiant, compte.Role);
+        var inscription = await app.AvecBaseAsync(db => db.Inscriptions.AsNoTracking().SingleAsync(i => i.EtudiantId == compte.EtudiantId));
+        Assert.Equal(Inscription.EnAttente, inscription.Statut);
+
+        var espace = await etudiant.GetAsync("/EspaceEtudiant");
+        Assert.Equal(HttpStatusCode.OK, espace.StatusCode);
+        var html = await espace.TexteAsync();
+        Assert.Contains("AMEGAN", html);
+        Assert.Contains(compte.Etudiant!.Matricule, html);
+        Assert.Contains("en attente de validation", html);
+        Assert.DoesNotContain("AGBEKO", html);
+
+        // Rien d'autre : ni le tableau de bord, ni les sections du personnel, ni l'attestation d'une inscription non validée
+        Assert.Contains("/EspaceEtudiant", (await etudiant.GetAsync("/")).Headers.Location!.ToString());
+        foreach (var url in new[] { "/Etudiants", "/Inscriptions", "/Paiements", "/Notes", "/Documents", "/Comptes", "/Permissions", "/Journal" })
+            Assert.True((await etudiant.GetAsync(url)).StatusCode == HttpStatusCode.Forbidden, url);
+        var attestation = $"/EspaceEtudiant/Document?type={TypeDocument.AttestationInscription}&id={inscription.Id}";
+        Assert.Equal(HttpStatusCode.Redirect, (await etudiant.GetAsync(attestation)).StatusCode);
+
+        // La même adresse ne sert pas deux fois
+        var doublon = await app.Navigateur().EnvoyerAsync("/InscriptionEnLigne", "/InscriptionEnLigne", Candidature(filiere, niveau, "yao.amegan@test.local"));
+        Assert.Equal(HttpStatusCode.OK, doublon.StatusCode);
+        Assert.Contains("existe déjà avec cette adresse", await doublon.TexteAsync());
+
+        // Le personnel n'a pas d'espace étudiant ; une fois l'inscription validée, l'attestation est délivrée
+        var admin = await app.AdminAsync();
+        Assert.Equal(HttpStatusCode.Forbidden, (await admin.GetAsync("/EspaceEtudiant")).StatusCode);
+        Assert.Contains(compte.Etudiant.Matricule, await admin.GetStringAsync("/Comptes?etudiants=true"));
+        var validation = await admin.EnvoyerAsync($"/Inscriptions/Details/{inscription.Id}", $"/Inscriptions/Statut/{inscription.Id}", ("statut", Inscription.Validee));
+        Assert.Equal(HttpStatusCode.Redirect, validation.StatusCode);
+        Assert.Equal("application/pdf", (await etudiant.GetAsync(attestation)).Content.Headers.ContentType?.MediaType);
+    }
+
+    [MySqlFact]
+    public async Task Un_etudiant_deja_enregistre_active_son_compte_et_telecharge_ses_documents()
+    {
+        using var app = new Application();
+        var (agbeko, inscription, autre) = await app.AvecBaseAsync(async db => (
+            await db.Etudiants.AsNoTracking().SingleAsync(e => e.Nom == "AGBEKO"),
+            await db.Inscriptions.Where(i => i.Etudiant!.Nom == "AGBEKO").Select(i => i.Id).SingleAsync(),
+            await db.Inscriptions.Where(i => i.Etudiant!.Nom != "AGBEKO").Select(i => i.Id).FirstAsync()));
+        (string, string)[] Activation(string naissance) =>
+        [
+            ("Matricule", agbeko.Matricule), ("DateNaissance", naissance), ("Email", agbeko.Email),
+            ("MotDePasse", "etudiant-Test-789"), ("Confirmation", "etudiant-Test-789")
+        ];
+        var client = app.Navigateur();
+
+        // Une seule information fausse suffit à refuser
+        var refus = await client.EnvoyerAsync("/InscriptionEnLigne/Activer", "/InscriptionEnLigne/Activer", Activation("2000-01-01"));
+        Assert.Equal(HttpStatusCode.OK, refus.StatusCode);
+        Assert.Contains("ne correspondent à aucun dossier", await refus.TexteAsync());
+
+        var naissance = agbeko.DateNaissance.ToString("yyyy-MM-dd");
+        var active = await client.EnvoyerAsync("/InscriptionEnLigne/Activer", "/InscriptionEnLigne/Activer", Activation(naissance));
+        Assert.Equal(HttpStatusCode.Redirect, active.StatusCode);
+
+        // Un seul compte par dossier
+        var encore = await app.Navigateur().EnvoyerAsync("/InscriptionEnLigne/Activer", "/InscriptionEnLigne/Activer", Activation(naissance));
+        Assert.Contains("ne correspondent à aucun dossier", await encore.TexteAsync());
+
+        var page = await client.GetStringAsync("/EspaceEtudiant");
+        Assert.Contains("Algorithmique", page);
+        Assert.Contains("Mobile Money", page);
+
+        foreach (var type in new[] { TypeDocument.AttestationInscription, TypeDocument.ReleveNotes, TypeDocument.RelevePaiements })
+        {
+            var pdf = await client.GetAsync($"/EspaceEtudiant/Document?type={type}&id={inscription}");
+            Assert.True(pdf.Content.Headers.ContentType?.MediaType == "application/pdf", type.ToString());
+        }
+
+        // L'inscription d'un autre étudiant, ou un document du personnel, restent inaccessibles
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/EspaceEtudiant/Document?type={TypeDocument.RelevePaiements}&id={autre}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/EspaceEtudiant/Document?type={TypeDocument.ListeInscrits}&id={inscription}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync($"/Documents/Telecharger?type={TypeDocument.AttestationInscription}&id={autre}")).StatusCode);
+    }
+
+    [MySqlFact]
+    public async Task Les_permissions_reglees_par_l_administrateur_s_appliquent_immediatement()
+    {
+        using var app = new Application();
+        var admin = await app.AdminAsync();
+        var lecteur = await app.ProfilAsync(admin, Roles.Consultation);
+        Assert.Equal(HttpStatusCode.Forbidden, (await lecteur.GetAsync("/Etudiants/Create")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await lecteur.GetAsync("/Paiements")).StatusCode);
+
+        // Consultation : écriture sur les étudiants, plus aucun accès aux paiements ; le reste inchangé
+        var champs = Roles.Configurables
+            .SelectMany(role => MatriceDroits.Sections.Select(section => (PermissionsController.Champ(role, section), ((role, section.Controleur) switch
+            {
+                (Roles.Consultation, "Etudiants") => Acces.Ecriture,
+                (Roles.Consultation, "Paiements") => Acces.Aucun,
+                _ => MatriceDroits.ParDefaut(role, section)
+            }).ToString())))
+            .ToArray();
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.EnvoyerAsync("/Permissions", "/Permissions", champs)).StatusCode);
+
+        // Sans reconnexion
+        Assert.Equal(HttpStatusCode.OK, (await lecteur.GetAsync("/Etudiants/Create")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await lecteur.GetAsync("/Paiements")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await lecteur.GetAsync("/Tarifs")).StatusCode);
+        Assert.True(await app.AvecBaseAsync(db => db.JournalAudit.AnyAsync(j => j.Entite == nameof(Permission))));
+
+        // Une valeur inconnue est refusée ; un autre profil que l'administrateur ne règle rien
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.EnvoyerAsync("/Permissions", "/Permissions", ("Consultation|Etudiants", "Tout"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await lecteur.GetAsync("/Permissions")).StatusCode);
+
+        // Retour aux valeurs par défaut
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.EnvoyerAsync("/Permissions", "/Permissions/Reinitialiser")).StatusCode);
+        Assert.Equal(0, await app.AvecBaseAsync(db => db.Permissions.CountAsync()));
+        Assert.Equal(HttpStatusCode.Forbidden, (await lecteur.GetAsync("/Etudiants/Create")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await lecteur.GetAsync("/Paiements")).StatusCode);
     }
 }

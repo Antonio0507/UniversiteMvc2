@@ -9,8 +9,12 @@ namespace UniversiteMvc2.Tests;
 // Règles métier pures : aucune base de données nécessaire
 public class ReglesTests
 {
+    // Utilisateur connecté avec les permissions par défaut de son profil, comme les pose Sessions.ValiderAsync
     private static ClaimsPrincipal Profil(string role) =>
-        new(new ClaimsIdentity([new Claim(ClaimTypes.Role, role)], "test"));
+        Profil(role, MatriceDroits.ParDefaut(role));
+
+    private static ClaimsPrincipal Profil(string role, IReadOnlyDictionary<string, Acces> acces) =>
+        new(new ClaimsIdentity([new Claim(ClaimTypes.Role, role), .. Droits.Claims(acces)], "test"));
 
     [Theory]
     [InlineData(null, null, null)]
@@ -169,4 +173,55 @@ public class ReglesTests
     [InlineData(Roles.Consultation, "Salles", "Edit", true, false)]
     public void Matrice_des_droits(string role, string controleur, string action, bool lecture, bool attendu) =>
         Assert.Equal(attendu, Droits.Autorise(Profil(role), controleur, action, lecture));
+
+    [Fact]
+    public void Un_etudiant_n_accede_a_aucune_section_du_personnel()
+    {
+        var etudiant = Profil(Roles.Etudiant);
+        Assert.All(Navigation.Sections, s => Assert.False(Droits.PeutLire(etudiant, s.Controleur), s.Controleur));
+        Assert.Empty(Navigation.Visibles(etudiant));
+    }
+
+    [Fact]
+    public void Une_permission_modifiee_remplace_la_valeur_par_defaut()
+    {
+        var acces = MatriceDroits.ParDefaut(Roles.Consultation).ToDictionary();
+        acces["Etudiants"] = Acces.Ecriture;
+        acces["Paiements"] = Acces.Aucun;
+        var lecteur = Profil(Roles.Consultation, acces);
+
+        Assert.True(Droits.Autorise(lecteur, "Etudiants", "Create", true));
+        Assert.False(Droits.Autorise(lecteur, "Paiements", "Index", true));
+        Assert.DoesNotContain(Navigation.Visibles(lecteur), s => s.Controleur == "Paiements");
+        Assert.True(Droits.Autorise(lecteur, "Tarifs", "Index", true));
+        Assert.False(Droits.Autorise(lecteur, "Tarifs", "Create", true));
+    }
+
+    [Theory]
+    [InlineData("Comptes")]
+    [InlineData("Permissions")]
+    [InlineData("Journal")]
+    public void Les_sections_reservees_ne_se_delegent_pas(string controleur)
+    {
+        // Même une permission forgée ne donne pas accès à l'administration
+        var scolarite = Profil(Roles.Scolarite, new Dictionary<string, Acces> { [controleur] = Acces.Ecriture });
+        Assert.False(Droits.PeutLire(scolarite, controleur));
+        Assert.DoesNotContain(MatriceDroits.Sections, s => s.Controleur == controleur);
+    }
+
+    [Fact]
+    public void L_administrateur_a_tous_les_droits_sans_permission()
+    {
+        var admin = Profil(Roles.Administrateur, new Dictionary<string, Acces>());
+        Assert.All(Navigation.Sections, s => Assert.True(Droits.PeutEcrire(admin, s.Controleur), s.Controleur));
+    }
+
+    [Fact]
+    public void Une_valeur_d_acces_invalide_vaut_aucun_acces()
+    {
+        var bricole = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.Role, Roles.Consultation), new Claim(Droits.ClaimAcces, "Etudiants=7"), new Claim(Droits.ClaimAcces, "Notes=x")], "test"));
+        Assert.False(Droits.PeutLire(bricole, "Etudiants"));
+        Assert.False(Droits.PeutLire(bricole, "Notes"));
+    }
 }

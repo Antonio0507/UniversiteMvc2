@@ -66,19 +66,11 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
             contexte.Response.StatusCode = StatusCodes.Status403Forbidden;
             return Task.CompletedTask;
         };
-        // Compte désactivé, mot de passe ou profil changé : la session s'arrête à la requête suivante
-        options.Events.OnValidatePrincipal = async contexte =>
-        {
-            var db = contexte.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
-            var id = int.TryParse(contexte.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var n) ? n : 0;
-            var jeton = contexte.Principal?.FindFirst(Droits.ClaimJeton)?.Value;
-            if (!await db.Comptes.AnyAsync(c => c.Id == id && c.Actif && c.Jeton == jeton))
-            {
-                contexte.RejectPrincipal();
-                await contexte.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            }
-        };
+        // Compte désactivé, mot de passe ou profil changé : la session s'arrête à la requête suivante.
+        // Sinon, les droits du profil (matrice des permissions) sont ajoutés à la requête.
+        options.Events.OnValidatePrincipal = Sessions.ValiderAsync;
     });
+builder.Services.AddSingleton<MatriceDroits>();
 builder.Services.AddAuthorization(options =>
     options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 

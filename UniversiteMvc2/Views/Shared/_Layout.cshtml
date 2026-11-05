@@ -30,7 +30,7 @@
             {
             <nav class="tete__nav" id="barre-nav" aria-label="Sommaire">
                 <a class="tete__lien @(courante == null ? "est-actif" : null)" asp-controller="Home" asp-action="Index"
-                   aria-current="@(courante == null ? "page" : null)">Tableau de bord</a>
+                   aria-current="@(courante == null ? "page" : null)">@(User.IsInRole(Roles.Etudiant) ? "Mon espace" : "Tableau de bord")</a>
 
                 @foreach (var groupe in Navigation.Visibles(User).GroupBy(s => s.Groupe))
                 {

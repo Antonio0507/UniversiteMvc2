@@ -3,8 +3,8 @@ using System.ComponentModel.DataAnnotations;
 namespace UniversiteMvc2.Models;
 
 /// <summary>
-/// Profils de l'application. L'administrateur a tous les droits ; les autres écrivent uniquement dans leurs modules
-/// (voir Navigation) et consultent le reste.
+/// Profils de l'application. L'administrateur a tous les droits ; les droits des profils du personnel se règlent
+/// dans Permissions ; un étudiant n'a accès qu'à son espace.
 /// </summary>
 public static class Roles
 {
@@ -16,13 +16,19 @@ public static class Roles
     public const string Comptabilite = "Comptabilité";
     /// <summary>Lecture seule, sans export CSV.</summary>
     public const string Consultation = "Consultation";
+    /// <summary>Étudiant inscrit en ligne : accède uniquement à son espace (EspaceEtudiant).</summary>
+    public const string Etudiant = "Étudiant";
 
-    /// <summary>Les quatre profils, dans l'ordre des listes.</summary>
-    public static readonly string[] Tous = [Administrateur, Scolarite, Comptabilite, Consultation];
+    /// <summary>Les profils du personnel, dans l'ordre des listes.</summary>
+    public static readonly string[] Personnel = [Administrateur, Scolarite, Comptabilite, Consultation];
+
+    /// <summary>Les profils dont l'administrateur règle les droits section par section (page Permissions).</summary>
+    public static readonly string[] Configurables = [Scolarite, Comptabilite, Consultation];
 }
 
 /// <summary>
-/// Compte de connexion du personnel. Distinct de Utilisateur, qui décrit les étudiants et les enseignants.
+/// Compte de connexion du personnel ou d'un étudiant. Distinct de Utilisateur, qui décrit les étudiants et les
+/// enseignants : le compte d'un étudiant pointe vers son dossier (EtudiantId).
 /// </summary>
 public class Compte
 {
@@ -46,9 +52,15 @@ public class Compte
     /// <summary>Profil du compte (voir Roles).</summary>
     [Required]
     [StringLength(20)]
-    [AllowedValues(Roles.Administrateur, Roles.Scolarite, Roles.Comptabilite, Roles.Consultation, ErrorMessage = "Profil inconnu.")]
+    [AllowedValues(Roles.Administrateur, Roles.Scolarite, Roles.Comptabilite, Roles.Consultation, Roles.Etudiant, ErrorMessage = "Profil inconnu.")]
     [Display(Name = "Profil")]
     public string Role { get; set; } = Roles.Consultation;
+
+    /// <summary>Dossier de l'étudiant, pour un compte du profil Étudiant ; null pour le personnel.</summary>
+    public int? EtudiantId { get; set; }
+
+    /// <summary>Dossier de l'étudiant (propriété de navigation, chargée avec Include).</summary>
+    public Etudiant? Etudiant { get; set; }
 
     /// <summary>Un compte désactivé ne peut plus se connecter ; ses sessions sont fermées.</summary>
     [Display(Name = "Compte actif")]

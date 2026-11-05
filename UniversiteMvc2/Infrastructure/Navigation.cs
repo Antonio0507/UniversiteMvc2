@@ -10,8 +10,8 @@ namespace UniversiteMvc2.Infrastructure;
 /// <param name="Titre">Titre de la section.</param>
 /// <param name="Groupe">Groupe du menu (Scolarité, Finances…).</param>
 /// <param name="Modele">Entité gérée par la section, utilisée par les vues génériques pour créer des liens.</param>
-/// <param name="Ecriture">Profils autorisés à modifier la section, en plus de l'administrateur (null = tout utilisateur connecté).</param>
-/// <param name="Reserve">Section invisible et inaccessible hors administrateur.</param>
+/// <param name="Ecriture">Profils autorisés par défaut à modifier la section, en plus de l'administrateur (null = tous les profils du personnel) ; les autres la lisent. Réglable ensuite dans Permissions.</param>
+/// <param name="Reserve">Section invisible et inaccessible hors administrateur, et non réglable dans Permissions.</param>
 public record Section(string Numero, string Controleur, string Titre, string Groupe, Type? Modele = null, string[]? Ecriture = null, bool Reserve = false);
 
 /// <summary>Sommaire de l'application : ajouter un module = ajouter une ligne ici</summary>
@@ -41,7 +41,8 @@ public static class Navigation
         new("16", "AnneesAcad", "Années académiques", "Calendrier", typeof(AnneeAcad), Scolarite),
         new("17", "Documents", "Documents PDF", "Édition"),
         new("18", "Comptes", "Comptes", "Administration", Reserve: true),
-        new("19", "Journal", "Journal d'audit", "Administration", Reserve: true),
+        new("19", "Permissions", "Permissions", "Administration", Reserve: true),
+        new("20", "Journal", "Journal d'audit", "Administration", Reserve: true),
     ];
 
     /// <summary>Section d'un contrôleur, ou null s'il n'est pas au sommaire.</summary>

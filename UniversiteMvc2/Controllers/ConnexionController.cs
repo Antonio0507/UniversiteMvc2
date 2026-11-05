@@ -107,7 +107,7 @@ public class ConnexionController : AppController
         _context.JournalAudit.Add(new JournalAudit { Auteur = compte.Email, Action = "Connexion", Entite = nameof(Compte), EntiteId = compte.Id });
         await _context.SaveChangesAsync();
 
-        await OuvrirSessionAsync(compte);
+        await Sessions.OuvrirAsync(HttpContext, compte);
         _journal.LogInformation("Connexion de {Identifiant} ({Role}) depuis {Ip}", compte.Email, compte.Role, ip);
 
         if (compte.DoitChangerMotDePasse) return RedirectToAction(nameof(MotDePasse));
@@ -163,26 +163,10 @@ public class ConnexionController : AppController
         compte.Jeton = Guid.NewGuid().ToString();   // déconnecte les autres sessions de ce compte
         await _context.SaveChangesAsync();
 
-        await OuvrirSessionAsync(compte);
+        await Sessions.OuvrirAsync(HttpContext, compte);
         _journal.LogInformation("Mot de passe modifié par {Identifiant}", compte.Email);
         Succes("Mot de passe modifié.");
         return RedirectToAction("Index", "Home");
-    }
-
-    private Task OuvrirSessionAsync(Compte compte)
-    {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, compte.Id.ToString()),
-            new(ClaimTypes.Name, compte.Nom),
-            new(ClaimTypes.Email, compte.Email),
-            new(ClaimTypes.Role, compte.Role),
-            new(Droits.ClaimJeton, compte.Jeton)
-        };
-        if (compte.DoitChangerMotDePasse) claims.Add(new Claim(Droits.ClaimDoitChanger, "1"));
-
-        var identite = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        return HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identite));
     }
 
     private static string Tronquer(string texte, int longueur) => texte.Length <= longueur ? texte : texte[..longueur];
